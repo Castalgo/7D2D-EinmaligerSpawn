@@ -1,0 +1,9 @@
+<configs>
+
+  <!-- Entferne sämtliche Spawns beim Graben -->
+  <remove xpath="/quests/quest[contains(@id, '_buried_supplies')]//action[@type='SpawnGSEnemy']"/>
+
+  <!-- Entferne Explosionsevent bei Schatz -->
+  <remove xpath="/quests/quest[contains(@id, '_buried_supplies')]//objective[@type='TreasureChest']/property[@name='explosion_event']"/>
+
+</configs>

@@ -1,0 +1,19 @@
+<configs>
+  <!-- Einheitliche Spawnanzahl und kein Respawn in allen Biomen -->
+  
+  <!-- maxcount für alle Biome setzen (inkl. wasteland) -->
+  <set xpath="/spawning/biome/spawn[@id='dz01']/@maxcount">2</set>
+  <set xpath="/spawning/biome/spawn[@id='nz01']/@maxcount">4</set>
+  <set xpath="/spawning/biome/spawn[@id='dz02']/@maxcount">8</set>
+  <set xpath="/spawning/biome/spawn[@id='nz02']/@maxcount">8</set>
+  <set xpath="/spawning/biome/spawn[@id='dz03']/@maxcount">8</set>
+  <set xpath="/spawning/biome/spawn[@id='nz03']/@maxcount">8</set>
+
+  <!-- respawndelay für alle einzeln setzen -->
+  <set xpath="/spawning/biome/spawn[@id='dz01']/@respawndelay">9999999</set>
+  <set xpath="/spawning/biome/spawn[@id='nz01']/@respawndelay">9999999</set>
+  <set xpath="/spawning/biome/spawn[@id='dz02']/@respawndelay">9999999</set>
+  <set xpath="/spawning/biome/spawn[@id='nz02']/@respawndelay">9999999</set>
+  <set xpath="/spawning/biome/spawn[@id='dz03']/@respawndelay">9999999</set>
+  <set xpath="/spawning/biome/spawn[@id='nz03']/@respawndelay">9999999</set>
+</configs>

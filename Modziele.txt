@@ -1,0 +1,23 @@
+Ziele der Mod zzz_EinmaligerSpawn (Version 3.x.x)
+----------------------------------------------------------------
+[GRUNDLAGE / MOD ZIEL]
+- Ziel 5: Gegner spawnen genau einmal und zwar beim erstmaligen Betreten eines Chunks
+
+[XML-LOGIK: WELTEINSTELLUNGEN & HÄNDLER]
+- Ziel 1: Händler bieten ab Spielstart ihr bestes Sortiment an (höchste Lootstufe simuliert).
+- Ziel 2: Alle Händler-Quest-Tierstufen werden nach nur einer erfolgreich abgeschlossenen Quest freigeschaltet.
+- Ziel 3: Kein Spawn von Zombie-Wellen bei verkleinernden Kreisen von Grabequests.
+- Ziel 8: In jedem Biom (Wald, Wüste, Schnee etc.) spawnen initial doppelt so viele Zombies wie standardmäßig im Ödland.
+
+[C#-LOGIK: GEBÄUDE & POIs]
+- Die festen Sleeper-Spawnpunkte innerhalb eines POIs (Gebäudes) triggern genau einmal beim erstmaligen Betreten.
+- Ziel 6: Nach der Räumung bleiben sie dauerhaft leer (kein natürlicher Respawn).
+- Quest-Ausnahme zu Ziel 6: Startet der Spieler explizit eine Händler-Quest am gelben Ausrufezeichen eines POIs, ist das Zurücksetzen (Reset) des Gebäudes und
+  der Sleeper-Spawnpunkte als bewusste Gameplay-Entscheidung erlaubt.
+
+[C#-LOGIK: WILDNIS & CHUNKS]
+- Die offene Welt ist in Chunks (Planquadrate) unterteilt. Beim erstmaligen Generieren/Betreten eines Chunks wird die Zombiedichte maximal befüllt. 
+- ziel 7: Das Spiel darf für einen bereits generierten Chunk niemals die standardmäßige, zeitbasierte Spawn-Logik für Biom-Zombies erneut aufrufen.
+- Ziel 4: Beim Verlassen eines Chunks werden die dort lebenden Biom-Zombies nicht gelöscht, sondern ihr Vorhandensein wird im Chunk-Datensatz gespeichert.
+  Kehrt der Spieler zurück, werden genau diese verbliebenen Zombies im Chunk reaktiviert (sie dürfen dabei die Position leicht verändert haben).
+  Wird ein Zombie getötet, ist er permanent aus diesem Chunk-Pool entfernt. Die Wildnis ist somit dauerhaft ausrottbar.
