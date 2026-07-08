@@ -43,7 +43,7 @@ namespace EinmaligerSpawn.Modifikation
         {
             try
             {
-                var path = Path.Combine(saveGameFolder, "Mods", "zzz_EinmaligerSpawn", "spawnedChunks.json");
+                var path = Path.Combine(saveGameFolder, "Mods", "EinmaligerSpawn", "spawnedChunks.json");
                 if (!File.Exists(path)) return;
 
                 var json = File.ReadAllText(path);
@@ -65,11 +65,11 @@ namespace EinmaligerSpawn.Modifikation
                 string path = Path.Combine(saveFolder, "spawnedChunks.json");
                 string json = JsonConvert.SerializeObject(SpawnedChunks, Formatting.Indented);
                 File.WriteAllText(path, json);
-                UnityEngine.Debug.Log("[zzz_EinmaligerSpawn] SpawnedChunks erfolgreich gespeichert.");
+                UnityEngine.Debug.Log("[EinmaligerSpawn] SpawnedChunks erfolgreich gespeichert.");
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.LogError($"[zzz_EinmaligerSpawn] Fehler beim Speichern von SpawnedChunks: {e.Message}");
+                UnityEngine.Debug.LogError($"[EinmaligerSpawn] Fehler beim Speichern von SpawnedChunks: {e.Message}");
             }
         }
 

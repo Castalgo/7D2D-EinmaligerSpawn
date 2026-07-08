@@ -4,21 +4,21 @@ using System.Diagnostics;
 using System.Reflection;
 using UnityEngine;
 
-namespace zzz_EinmaligerSpawn
+namespace EinmaligerSpawn
 {
-    public class zzz_EinmaligerSpawn : IModApi
+    public class EinmaligerSpawn : IModApi
     {
         public void InitMod(Mod mod)
         {
-            UnityEngine.Debug.Log("[zzz_EinmaligerSpawn] Initialisiere...");
+            UnityEngine.Debug.Log("[EinmaligerSpawn] Initialisiere...");
             var harmony = new Harmony("com.zzz.EinmaligerSpawn");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
-            UnityEngine.Debug.Log("[zzz_EinmaligerSpawn] Patch erfolgreich geladen");
+            UnityEngine.Debug.Log("[EinmaligerSpawn] Patch erfolgreich geladen");
         }
     }
 }
 
-namespace zzz_EinmaligerSpawn.Patches
+namespace EinmaligerSpawn.Patches
 {
     // Patch: Lade SpawnedChunks beim Laden des Savegames
     [HarmonyPatch(typeof(GameManager), "OnGameLoaded")]
@@ -28,7 +28,7 @@ namespace zzz_EinmaligerSpawn.Patches
         {
             string savePath = ChunkSpawnManager.GetSaveFolderPath();
             ChunkSpawnManager.LoadFromDisk(savePath);
-            UnityEngine.Debug.Log("[zzz_EinmaligerSpawn] SpawnedChunks aus Savegame geladen.");
+            UnityEngine.Debug.Log("[EinmaligerSpawn] SpawnedChunks aus Savegame geladen.");
         }
     }
 }

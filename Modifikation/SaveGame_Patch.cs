@@ -4,7 +4,7 @@ using HarmonyLib;
 using UnityEngine;
 using EinmaligerSpawn.Modifikation;
 
-namespace zzz_EinmaligerSpawn.Patches
+namespace EinmaligerSpawn.Patches
 {
     [HarmonyPatch(typeof(GameManager), "SaveGame")]
     public class Patch_GameManager_SaveGame
@@ -15,11 +15,11 @@ namespace zzz_EinmaligerSpawn.Patches
             {
                 string savePath = ChunkSpawnManager.GetSaveFolderPath();
                 ChunkSpawnManager.SaveToDisk(savePath);
-                Debug.Log("[zzz_EinmaligerSpawn] SpawnedChunks vor Speichern gesichert.");
+                Debug.Log("[EinmaligerSpawn] SpawnedChunks vor Speichern gesichert.");
             }
             catch (System.Exception ex)
             {
-                Debug.LogError($"[zzz_EinmaligerSpawn] Fehler beim Speichern der SpawnedChunks: {ex.Message}");
+                Debug.LogError($"[EinmaligerSpawn] Fehler beim Speichern der SpawnedChunks: {ex.Message}");
             }
         }
     }

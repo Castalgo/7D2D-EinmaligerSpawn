@@ -2,7 +2,7 @@
 
 using HarmonyLib;
 
-namespace zzz_EinmaligerSpawn.Patches
+namespace EinmaligerSpawn.Patches
 {
     [HarmonyPatch(typeof(SleeperVolume))]
     public class Patch_SleeperRespawn
@@ -12,7 +12,7 @@ namespace zzz_EinmaligerSpawn.Patches
         [HarmonyPrefix]
         public static bool Prefix_Respawn()
         {
-            // Debug.Log("[zzz_EinmaligerSpawn] Respawn unterdrückt.");
+            // Debug.Log("[EinmaligerSpawn] Respawn unterdrückt.");
             return false; // überspringt die Originalfunktion → Sleeper respawnen nicht mehr
         }
     }

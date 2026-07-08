@@ -3,7 +3,7 @@
 using HarmonyLib;
 using UnityEngine;
 
-namespace zzz_EinmaligerSpawn.Modifikation
+namespace EinmaligerSpawn.Modifikation
 {
     /// <summary>
     /// Verhindert, dass EntityAlive-Instanzen (z. B. Zombies oder Tiere) automatisch despawnen,
