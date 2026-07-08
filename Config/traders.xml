@@ -1,22 +1,5 @@
 <configs>
-
-  <!-- Öffnungszeiten ändern -->
-  <set xpath="/traders/trader_info[@id='1']/@open_time">0:01</set>
-  <set xpath="/traders/trader_info[@id='1']/@close_time">23:59</set>
-
-  <set xpath="/traders/trader_info[@id='2']/@open_time">0:01</set>
-  <set xpath="/traders/trader_info[@id='2']/@close_time">23:59</set>
-
-  <set xpath="/traders/trader_info[@id='6']/@open_time">0:01</set>
-  <set xpath="/traders/trader_info[@id='6']/@close_time">23:59</set>
-
-  <set xpath="/traders/trader_info[@id='7']/@open_time">0:01</set>
-  <set xpath="/traders/trader_info[@id='7']/@close_time">23:59</set>
-
-  <set xpath="/traders/trader_info[@id='8']/@open_time">0:01</set>
-  <set xpath="/traders/trader_info[@id='8']/@close_time">23:59</set>
-
-  <!-- Setze quest_tier_mod so, dass eine einzige abgeschlossene Quest alle Trader-Stufen freischaltet -->
-  <set xpath="/traders/@quest_tier_mod">100,100,100,100,100,100,100</set>
-
+    <!-- ZIEL 1: Händler bieten ab Tag 1 das beste Sortiment an -->
+    <!-- Setzt den Levelmultiplikator für ALLE Items und Qualitätsstufen auf max -->
+	<set xpath="/traders/@quest_tier_mod">150,150,150,150,150,150,150</set>
 </configs>
