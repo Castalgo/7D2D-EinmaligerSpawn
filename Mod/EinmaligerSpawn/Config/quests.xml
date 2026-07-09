@@ -1,0 +1,9 @@
+<configs>
+    <!-- ZIEL 3: Keine Zombie-Wellen bei Grabequests (Buried Supplies) -->
+    
+    <!-- 1. Verhindert Spawns beim Verkleinern des Suchradius (Radius Reduction) -->
+    <remove xpath="/quests/quest[contains(@id, 'buried_supplies')]/event[@type='TreasureRadiusReduction']" />
+    
+    <!-- 2. Verhindert den finalen Zombie-Spawn, sobald die Truhe geöffnet/gelootet wird -->
+    <remove xpath="/quests/quest[contains(@id, 'buried_supplies')]/action[@type='SpawnGSEnemy']" />
+</configs>
