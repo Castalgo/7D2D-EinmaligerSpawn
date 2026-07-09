@@ -1,5 +1,5 @@
 <xml>
-  <Name value="EinmaligerSpawn" />
+  <Name value="zzz_EinmaligerSpawn" />
   <DisplayName value="Einmaliger Spawn – Keine Respawns" />
   <Description value="Gegner spawnen beim erstmaligen betreten und danach nie wieder. Händler sind mit einer Quest auf Maximum und bei Grabequests spawnen keine Gegner mehr. Die Spawnmenge wurde verdoppelt und auf Ödlandniveau angehoben." />
   <Author value="Castalgo" />

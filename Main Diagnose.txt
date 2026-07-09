@@ -1,0 +1,46 @@
+﻿using HarmonyLib;
+using System.Reflection;
+using UnityEngine;
+using System.Linq;
+
+namespace EinmaligerSpawn
+{
+    public class EinmaligerSpawnInit : IModApi
+    {
+        public void InitMod(Mod mod)
+        {
+            Debug.Log("[EinmaligerSpawn] Starte GameManager-Diagnose (Speichern/Laden)...");
+
+            try
+            {
+                // Wir zielen direkt auf den GameManager ab
+                var allTypes = typeof(GameManager).Assembly.GetTypes();
+                var gameManagerType = allTypes.FirstOrDefault(t => t.Name == "GameManager");
+
+                if (gameManagerType != null)
+                {
+                    foreach (var method in gameManagerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static))
+                    {
+                        // Wir filtern nach allem, was mit Speichern und Laden zu tun hat
+                        if (method.Name.Contains("Save") || method.Name.Contains("Load"))
+                        {
+                            var parameters = method.GetParameters();
+                            string paramStr = string.Join(", ", parameters.Select(p => p.ParameterType.Name + " " + p.Name));
+                            Debug.Log($"[EinmaligerSpawn-DIAGNOSE] {gameManagerType.Name}.{method.Name}({paramStr})");
+                        }
+                    }
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.Log($"[EinmaligerSpawn-DIAGNOSE] Fehler: {e.Message}");
+            }
+
+            // Harmony bleibt weiterhin deaktiviert, bis wir die neuen Namen haben
+            // var harmony = new Harmony("com.castalgo.einmaligerspawn");
+            // harmony.PatchAll(Assembly.GetExecutingAssembly());
+
+            Debug.Log("[EinmaligerSpawn] Diagnose beendet.");
+        }
+    }
+}
