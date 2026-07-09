@@ -3,7 +3,7 @@ using EinmaligerSpawn.Manager;
 
 namespace EinmaligerSpawn.Patches
 {
-    // 1. Der Patch für das Speichern (Dein Original - lebenswichtig!)
+    // Patch für das Speichern
     [HarmonyPatch(typeof(GameManager), "SaveWorld")]
     public class Patch_SaveGame
     {
@@ -18,7 +18,7 @@ namespace EinmaligerSpawn.Patches
         }
     }
 
-    // 2. Der Patch für das Laden des Spielstands (Dein Original)
+    // Patch für das Laden des Spielstands
     [HarmonyPatch(typeof(GameManager), "StartGame")]
     public class Patch_LoadGame
     {
@@ -33,7 +33,7 @@ namespace EinmaligerSpawn.Patches
         }
     }
 
-    // 3. Der NEUE Patch für das dynamische Überschreiben der Spawns
+    // NEUER Patch für das dynamische Überschreiben der Spawns
     [HarmonyPatch(typeof(GameManager), "Update")]
     public class Patch_GameManager_Update
     {

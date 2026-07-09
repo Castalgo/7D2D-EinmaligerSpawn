@@ -1,0 +1,6 @@
+<configs>
+	<!-- Kein Respawn in allen Biomen -->
+
+	<!-- respawndelay für alle einzeln setzen -->
+	<set xpath="/spawning/biome/spawn[starts-with(@entitygroup, 'Zombies')]/@respawndelay">9999999</set>
+</configs>
