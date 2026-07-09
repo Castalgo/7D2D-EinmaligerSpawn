@@ -3,7 +3,7 @@
   
 	<!-- ZIEL 8: Zombiedichte in allen Biomen verdoppeln -->
 	<!-- Der Standard-Höchstwert im Ödland liegt bei 4 (Innenstädte). Setze den Spawn für alle Zombie-Gruppen in sämtlichen Biomen auf 8 -->
-    <set xpath="/spawning/biome/spawn[starts-with(@entitygroup, 'Zombies')]/@maxcount">8</set>
+    <!--<set xpath="/spawning/biome/spawn[starts-with(@entitygroup, 'Zombies')]/@maxcount">8</set> -->
 
 	<!-- respawndelay für alle einzeln setzen -->
 	<set xpath="/spawning/biome/spawn[starts-with(@entitygroup, 'Zombies')]/@respawndelay">9999999</set>

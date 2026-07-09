@@ -9,6 +9,7 @@ namespace EinmaligerSpawn
         public void InitMod(Mod mod)
         {
             Debug.Log("[EinmaligerSpawn] Initialisiere Mod-Logik...");
+
             var harmony = new Harmony("com.castalgo.einmaligerspawn");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
             Debug.Log("[EinmaligerSpawn] Alle Patches erfolgreich geladen!");

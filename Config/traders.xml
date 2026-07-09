@@ -1,5 +1,0 @@
-<configs>
-    <!-- ZIEL 1: Händler bieten ab Tag 1 das beste Sortiment an -->
-    <!-- Setzt den Levelmultiplikator für ALLE Items und Qualitätsstufen auf max -->
-	<set xpath="/traders/@quest_tier_mod">150,150,150,150,150,150,150</set>
-</configs>

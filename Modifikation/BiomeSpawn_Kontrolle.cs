@@ -19,7 +19,7 @@ namespace EinmaligerSpawn.Patches
                 Vector3i chunkPos = _spawnData.chunk.GetWorldPos();
 
                 // 8 ist unser XML-Maxcount für Zombies
-                if (ChunkDatenbank.IstChunkAusgerottet(chunkPos, 8))
+                if (ChunkDatenbank.IstChunkAusgerottet(chunkPos, DynamischesSpawnLimit.MaxKills))
                 {
                     return false; // Blockiert den Spawn, da die Wildnis hier ausgerottet ist
                 }
