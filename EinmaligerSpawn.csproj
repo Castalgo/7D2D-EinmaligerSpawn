@@ -68,6 +68,7 @@
     <Compile Include="Modifikation\ChunkDatenbank.cs" />
     <Compile Include="Modifikation\POI_Sleeper_Kontrolle.cs" />
     <Compile Include="Modifikation\SpeichernLaden_Patch.cs" />
+    <Compile Include="Modifikation\TodesListener_Patch.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

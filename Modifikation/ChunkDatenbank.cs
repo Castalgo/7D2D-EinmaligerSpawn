@@ -11,20 +11,31 @@ namespace EinmaligerSpawn.Manager
         // Speichert die Anzahl der GETÖTETEN Zombies pro Chunk
         public static Dictionary<string, int> ToteZombiesProChunk = new Dictionary<string, int>();
 
+        // NEU: Das temporäre Gedächtnis (Entity-ID -> Ursprungs-Chunk-ID)
+        public static Dictionary<int, string> ZombieUrsprung = new Dictionary<int, string>();
+
         public static string GetChunkId(Vector3i pos)
         {
             return $"{pos.x >> 4}_{pos.z >> 4}";
         }
 
-        public static void AddToterZombie(Vector3i pos)
+        // NEU: Zählt einen Kill direkt über die Chunk-ID hoch
+        public static void AddToterZombieNachID(string chunkId, int maxZombies)
         {
-            string id = GetChunkId(pos);
-            if (!ToteZombiesProChunk.ContainsKey(id))
+            if (!ToteZombiesProChunk.ContainsKey(chunkId))
             {
-                ToteZombiesProChunk[id] = 0;
+                ToteZombiesProChunk[chunkId] = 0;
             }
-            ToteZombiesProChunk[id]++;
+
+            ToteZombiesProChunk[chunkId]++;
+
+            if (ToteZombiesProChunk[chunkId] == maxZombies)
+            {
+                Debug.Log($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} wurde soeben dauerhaft ausgerottet! ({maxZombies}/{maxZombies} Kills)");
+            }
         }
+
+        // (Die alte AddToterZombie-Methode haben wir entfernt, da wir jetzt die neue nutzen)
 
         public static bool IstChunkAusgerottet(Vector3i pos, int maxZombies)
         {

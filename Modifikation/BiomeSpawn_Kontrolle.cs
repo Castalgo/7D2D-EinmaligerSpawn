@@ -3,25 +3,24 @@ using EinmaligerSpawn.Manager;
 
 namespace EinmaligerSpawn.Patches
 {
-    // Wir zielen auf den neuen SpawnManagerBiomes ab
+    // ---------------------------------------------------------
+    // TEIL 1: Das Schloss (Verhindert neue Spawns)
+    // ---------------------------------------------------------
     [HarmonyPatch(typeof(SpawnManagerBiomes))]
     public class BiomeSpawn_Kontrolle
     {
-        // Wir nutzen exakt die Parameter aus deiner Diagnose
         [HarmonyPatch("SpawnUpdate")]
         [HarmonyPrefix]
         public static bool Prefix(string _spawnerName, bool _isSpawnEnemy, ChunkAreaBiomeSpawnData _spawnData)
         {
-            // Sicherheitsprüfung, damit es keine NullReference-Fehler gibt
             if (_spawnData != null && _spawnData.chunk != null)
             {
-                // Wir holen uns die Chunk-Koordinate direkt aus dem Chunk-Objekt
                 Vector3i chunkPos = _spawnData.chunk.GetWorldPos();
 
-                // 8 ist unser XML-Maxcount für Zombies
+                // Prüft, ob das dynamische Limit für diesen Chunk bereits erreicht wurde
                 if (ChunkDatenbank.IstChunkAusgerottet(chunkPos, DynamischesSpawnLimit.MaxKills))
                 {
-                    return false; // Blockiert den Spawn, da die Wildnis hier ausgerottet ist
+                    return false; // Chunk ist ausgerottet -> Blockiert den Spawn
                 }
             }
 
@@ -29,15 +28,23 @@ namespace EinmaligerSpawn.Patches
         }
     }
 
-    // Der Trigger: Zählt hoch, wenn ein Zombie stirbt
-    [HarmonyPatch(typeof(EntityAlive), "SetDead")]
-    public class Zombie_Tod_Zaehler
+    // ---------------------------------------------------------
+    // TEIL 2: Der Tracker (Das Radar beim Spawnen)
+    // ---------------------------------------------------------
+    [HarmonyPatch(typeof(World), "SpawnEntityInWorld")]
+    public class Spawn_Tracker_Patch
     {
-        public static void Postfix(EntityAlive __instance)
+        [HarmonyPostfix]
+        public static void Postfix(Entity _entity)
         {
-            if (__instance is EntityZombie) // Ignoriert Tiere
+            // Wir filtern nach Zombies (ignorieren Tiere, Spieler etc.)
+            if (_entity is EntityZombie)
             {
-                ChunkDatenbank.AddToterZombie(__instance.GetBlockPosition());
+                // 1. Wir ermitteln den Chunk, in dem der Zombie gerade das Licht der Welt erblickt
+                string startChunk = ChunkDatenbank.GetChunkId(_entity.GetBlockPosition());
+
+                // 2. Wir speichern die ID des Zombies und seinen Geburts-Chunk im Gedächtnis
+                ChunkDatenbank.ZombieUrsprung[_entity.entityId] = startChunk;
             }
         }
     }
