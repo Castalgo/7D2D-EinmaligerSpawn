@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using EinmaligerSpawn.Manager;
+using HarmonyLib;
 using System.Reflection;
 using UnityEngine;
 
@@ -12,6 +13,13 @@ namespace EinmaligerSpawn
 
             var harmony = new Harmony("com.castalgo.einmaligerspawn");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
+
+            // HIER IST DER FIX: Das Schlüsselwort "ref" wurde zum Parameter hinzugefügt
+            ModEvents.GameUpdate.RegisterHandler((ref ModEvents.SGameUpdateData data) =>
+            {
+                AutoSpawner.OnGameUpdate();
+            });
+
             Debug.Log("[EinmaligerSpawn] Alle Patches erfolgreich geladen!");
         }
     }
