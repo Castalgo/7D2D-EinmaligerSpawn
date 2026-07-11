@@ -1,50 +1,55 @@
 ﻿using HarmonyLib;
 using EinmaligerSpawn.Manager;
+using UnityEngine;
 
 namespace EinmaligerSpawn.Patches
 {
     // ---------------------------------------------------------
-    // TEIL 1: Das Schloss (Verhindert neue Spawns)
+    // TEIL 1: Der "Terrain-Fake" (Das präzise Schloss)
     // ---------------------------------------------------------
-    [HarmonyPatch(typeof(SpawnManagerBiomes))]
-    public class BiomeSpawn_Kontrolle
+    [HarmonyPatch(typeof(World), "GetRandomSpawnPositionInAreaMinMaxToPlayers")]
+    public class World_GetRandomSpawnPosition_Patch
     {
-        [HarmonyPatch("SpawnUpdate")]
-        [HarmonyPrefix]
-        public static bool Prefix(string _spawnerName, bool _isSpawnEnemy, ChunkAreaBiomeSpawnData _spawnData)
+        // Wir fangen 'out Chunk _chunk' über 'ref Chunk _chunk' ab und prüfen das boolsche Ergebnis
+        [HarmonyPostfix]
+        public static void Postfix(ref bool __result, ref Chunk _chunk)
         {
-            if (_spawnData != null && _spawnData.chunk != null)
+            // Hat die Engine einen gültigen Spawn-Platz gefunden?
+            if (__result && _chunk != null)
             {
-                Vector3i chunkPos = _spawnData.chunk.GetWorldPos();
+                Vector3i chunkPos = _chunk.GetWorldPos();
 
-                // Prüft, ob das dynamische Limit für diesen Chunk bereits erreicht wurde
+                // Wir prüfen EXAKT diesen einen 16x16 Chunk
                 if (ChunkDatenbank.IstChunkAusgerottet(chunkPos, DynamischesSpawnLimit.MaxKills))
                 {
-                    return false; // Chunk ist ausgerottet -> Blockiert den Spawn
+                    // VETO! Wir sabotieren die Platzsuche. 
+                    // Die Engine denkt, der Bauplatz sei ungültig und sucht woanders weiter, 
+                    // ohne dass der globale Biome-Manager abgeschaltet wird.
+                    __result = false;
                 }
             }
-
-            return true; // Lässt das Spiel normal spawnen
         }
     }
 
     // ---------------------------------------------------------
-    // TEIL 2: Der Tracker (Das Radar beim Spawnen)
+    // TEIL 2: Die physische Rückmeldung (Die korrekte Zuordnung)
     // ---------------------------------------------------------
-    [HarmonyPatch(typeof(World), "SpawnEntityInWorld")]
-    public class Spawn_Tracker_Patch
+    [HarmonyPatch(typeof(SpawnManagerBiomes), "OnEntitySpawned")]
+    public class BiomeSpawn_OnEntitySpawned_Patch
     {
         [HarmonyPostfix]
-        public static void Postfix(Entity _entity)
+        public static void Postfix(Entity __0) // Parameter __1 (der Manager) wird komplett ignoriert!
         {
-            // Wir filtern nach Zombies (ignorieren Tiere, Spieler etc.)
-            if (_entity is EntityZombie)
+            if (__0 != null && __0 is EntityEnemy)
             {
-                // 1. Wir ermitteln den Chunk, in dem der Zombie gerade das Licht der Welt erblickt
-                string startChunk = ChunkDatenbank.GetChunkId(_entity.GetBlockPosition());
+                // Wir lesen die echten physischen Koordinaten des Zombies in der Welt ab
+                Vector3i physischePosition = __0.GetBlockPosition();
 
-                // 2. Wir speichern die ID des Zombies und seinen Geburts-Chunk im Gedächtnis
-                ChunkDatenbank.ZombieUrsprung[_entity.entityId] = startChunk;
+                // Wir wandeln diese Weltkoordinaten in unsere 16x16 Chunk-ID um
+                string exakterChunkID = ChunkDatenbank.GetChunkId(physischePosition);
+
+                // Der Kill landet zwingend in dem Chunk, in dem der Zombie die Füße auf den Boden setzt
+                ChunkDatenbank.ZombieUrsprung[__0.entityId] = exakterChunkID;
             }
         }
     }

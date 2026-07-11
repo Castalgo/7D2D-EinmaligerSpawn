@@ -66,6 +66,7 @@
     <Compile Include="Main.cs" />
     <Compile Include="Modifikation\BiomeSpawn_Kontrolle.cs" />
     <Compile Include="Modifikation\ChunkDatenbank.cs" />
+    <Compile Include="Modifikation\KonsolenBefehle.cs" />
     <Compile Include="Modifikation\POI_Sleeper_Kontrolle.cs" />
     <Compile Include="Modifikation\SpeichernLaden_Patch.cs" />
     <Compile Include="Modifikation\TodesListener_Patch.cs" />
@@ -88,6 +89,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Debug\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

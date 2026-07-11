@@ -11,7 +11,7 @@ namespace EinmaligerSpawn.Manager
         // Speichert die Anzahl der GETÖTETEN Zombies pro Chunk
         public static Dictionary<string, int> ToteZombiesProChunk = new Dictionary<string, int>();
 
-        // NEU: Das temporäre Gedächtnis (Entity-ID -> Ursprungs-Chunk-ID)
+        // Das temporäre Gedächtnis (Entity-ID -> Ursprungs-Chunk-ID)
         public static Dictionary<int, string> ZombieUrsprung = new Dictionary<int, string>();
 
         public static string GetChunkId(Vector3i pos)
@@ -19,7 +19,7 @@ namespace EinmaligerSpawn.Manager
             return $"{pos.x >> 4}_{pos.z >> 4}";
         }
 
-        // NEU: Zählt einen Kill direkt über die Chunk-ID hoch
+        // Zählt einen Kill direkt über die Chunk-ID hoch
         public static void AddToterZombieNachID(string chunkId, int maxZombies)
         {
             if (!ToteZombiesProChunk.ContainsKey(chunkId))
@@ -29,20 +29,23 @@ namespace EinmaligerSpawn.Manager
 
             ToteZombiesProChunk[chunkId]++;
 
-            if (ToteZombiesProChunk[chunkId] == maxZombies)
+            // Kompromisslose Rückeroberung: Wildnis-Chunks verriegeln nach exakt 1 Kill.
+            int abriegelungsLimit = 1;
+
+            if (ToteZombiesProChunk[chunkId] == abriegelungsLimit)
             {
-                Debug.Log($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} wurde soeben dauerhaft ausgerottet! ({maxZombies}/{maxZombies} Kills)");
+                Debug.LogWarning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
             }
         }
 
-        // (Die alte AddToterZombie-Methode haben wir entfernt, da wir jetzt die neue nutzen)
-
+        // Prüft, ob in diesem Chunk noch gespawnt werden darf
         public static bool IstChunkAusgerottet(Vector3i pos, int maxZombies)
         {
             string id = GetChunkId(pos);
             if (ToteZombiesProChunk.ContainsKey(id))
             {
-                return ToteZombiesProChunk[id] >= maxZombies;
+                // Sobald auch nur 1 Kill registriert wurde, blockiert der Chunk neue Biom-Spawns
+                return ToteZombiesProChunk[id] >= 1;
             }
             return false;
         }
