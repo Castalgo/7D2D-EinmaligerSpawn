@@ -1,0 +1,12 @@
+Ziele der Mod zzz_EinmaligerSpawn (Version 3.x.x)
+----------------------------------------------------------------
+[Allgemeine Hinweise]
+Heat-Spawns (Screamer) müssen deaktiviert sein, weil sie die Spawnlogik umgehen.
+POI-Quests brechen das System, weil sie Zombies neu erschaffen, auch wenn Chunks clear sind
+
+[Sandbox-Einstellungen: Empfohlen]
+Müssen zwingend vom User korrekt gesetzt werden. Folgende Voreinstellungen sind für die Nutzung empfohlen:
+SaNdBoXcOdE
+
+[Sandbox-Einstellungen: Minimaleinstellungen]
+Diese Einstellungen stellen das Minimum für ein funktionierendes Spielerlebnis dar:

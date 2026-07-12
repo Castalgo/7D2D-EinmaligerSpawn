@@ -14,8 +14,7 @@ namespace EinmaligerSpawn.Commands
 
         public override string getDescription()
         {
-            // Update: 'es where' zur Beschreibung hinzugefügt
-            return "Verwaltet den Einmaligen Spawn. Nutze 'es range' (Prozent), 'es spawn [Anzahl]' oder 'es where'.";
+            return "Verwaltet den Einmaligen Spawn. Nutze 'es range [x]' (Prozent), 'es spawn [x]', 'es where' oder 'es cheat_clear [x]'.";
         }
 
         public override void Execute(List<string> _params, CommandSenderInfo _senderInfo)
@@ -129,22 +128,19 @@ namespace EinmaligerSpawn.Commands
 
                     if (closestEnemy != null)
                     {
-                        // 1. Wir suchen dynamisch eine NavObject-Klasse, die existiert und KEINE Bedingungen hat
-                        string magicClassName = "supply_drop"; // Fallback, falls die Schleife fehlschlägt
+                        string magicClassName = "supply_drop";
                         if (NavObjectClass.NavObjectClassList != null)
                         {
                             foreach (NavObjectClass noc in NavObjectClass.NavObjectClassList)
                             {
-                                // Suchen nach: Bedingung = None UND hat Kompass-Einstellungen
                                 if (noc.RequirementType == NavObjectClass.RequirementTypes.None && noc.CompassSettings != null)
                                 {
                                     magicClassName = noc.NavObjectClassName;
-                                    break; // Wir haben eine perfekte Klasse gefunden, Schleife abbrechen!
+                                    break;
                                 }
                             }
                         }
 
-                        // 2. Wir kapern diese gefundene Klasse, nutzen .transform für den Bypass und zwingen das rote Icon auf
                         NavObjectManager.Instance.RegisterNavObject(magicClassName, closestEnemy.transform, "ui_game_symbol_enemy_dot", false);
 
                         UnityEngine.Debug.Log($"[ES Spawner] Universal-Radar: Nächster Feind (Typ: {closestEnemy.GetType().Name}, ID: {closestEnemy.entityId}) ist {Mathf.RoundToInt(closestDist)}m entfernt.");
@@ -155,9 +151,70 @@ namespace EinmaligerSpawn.Commands
                         UnityEngine.Debug.Log("[ES Spawner] Universal-Radar: Keine lebenden Feinde in deinem geladenen Umfeld gefunden.");
                     }
                 }
+                // -----------------------------------------------------------------
+                // BEFEHL: es cheat_clear
+                // -----------------------------------------------------------------
+                else if (subCommand == "cheat_clear")
+                {
+                    int radiusMeter = 20; // Standardwert geändert
+
+                    if (_params.Count > 1)
+                    {
+                        if (int.TryParse(_params[1], out int parsedRadius))
+                        {
+                            // Begrenzung auf maximal 256 Meter
+                            radiusMeter = Mathf.Clamp(parsedRadius, 1, 256);
+                        }
+                    }
+
+                    Vector3i playerPos = player.GetBlockPosition();
+                    int px = playerPos.x;
+                    int pz = playerPos.z;
+
+                    int playerChunkX = px >> 4;
+                    int playerChunkZ = pz >> 4;
+
+                    int chunkSuchRadius = Mathf.CeilToInt((float)radiusMeter / 16f);
+                    int maxDistSq = radiusMeter * radiusMeter;
+
+                    int newlyCleared = 0;
+                    int totalChecked = 0;
+
+                    for (int cx = playerChunkX - chunkSuchRadius; cx <= playerChunkX + chunkSuchRadius; cx++)
+                    {
+                        for (int cz = playerChunkZ - chunkSuchRadius; cz <= playerChunkZ + chunkSuchRadius; cz++)
+                        {
+                            int minX = cx * 16;
+                            int maxX = minX + 15;
+                            int minZ = cz * 16;
+                            int maxZ = minZ + 15;
+
+                            int dx = Math.Max(0, Math.Max(minX - px, px - maxX));
+                            int dz = Math.Max(0, Math.Max(minZ - pz, pz - maxZ));
+
+                            if (dx * dx + dz * dz <= maxDistSq)
+                            {
+                                totalChecked++;
+                                string chunkId = $"{cx}_{cz}";
+
+                                if (!ChunkDatenbank.ToteZombiesProChunk.ContainsKey(chunkId))
+                                {
+                                    ChunkDatenbank.ToteZombiesProChunk[chunkId] = 0;
+                                    newlyCleared++;
+                                }
+
+                                // Stumpf +1 addieren
+                                ChunkDatenbank.ToteZombiesProChunk[chunkId]++;
+                            }
+                        }
+                    }
+
+                    UnityEngine.Debug.Log($"=== Cheat Clear ({radiusMeter}m) ===");
+                    UnityEngine.Debug.LogWarning($"[ES Spawner] Ich habe {totalChecked} Chunks geprüft und {newlyCleared} neu ausgerottet.");
+                }
                 else
                 {
-                    UnityEngine.Debug.Log("Bitte nutze 'es range', 'es spawn' oder 'es where'.");
+                    UnityEngine.Debug.Log("Bitte nutze 'es range [x]', 'es spawn [x]', 'es where' oder 'es cheat_clear [x]'.");
                 }
             }
         }

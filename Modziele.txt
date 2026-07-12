@@ -6,12 +6,10 @@ Ziele der Mod zzz_EinmaligerSpawn (Version 3.x.x)
 [XML-LOGIK: WELTEINSTELLUNGEN & HÄNDLER]
 - Ziel 3: Kein Spawn von Zombie-Wellen bei verkleinernden Kreisen von Grabequests.
 
-
 [C#-LOGIK: GEBÄUDE & POIs]
 - Die festen Sleeper-Spawnpunkte innerhalb eines POIs (Gebäudes) triggern genau einmal beim erstmaligen Betreten.
 - Ziel 6: Nach der Räumung bleiben sie dauerhaft leer (kein natürlicher Respawn).
-- Quest-Ausnahme zu Ziel 6: Startet der Spieler explizit eine Händler-Quest am gelben Ausrufezeichen eines POIs, ist das Zurücksetzen (Reset) des Gebäudes und
-  der Sleeper-Spawnpunkte als bewusste Gameplay-Entscheidung erlaubt.
+- Quest-Ausnahme zu Ziel 6: Der Händler kann geclearte POIs nicht mehr als "Säubern" oder "Abholen"-Questort festlegen.
 
 [C#-LOGIK: WILDNIS & CHUNKS]
 - Ziel 8: In jedem Biom (Wald, Wüste, Schnee etc.) spawnen initial doppelt so viele Zombies wie standardmäßig im Ödland bei Nacht.
