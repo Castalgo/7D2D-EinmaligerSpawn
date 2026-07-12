@@ -112,42 +112,53 @@ namespace EinmaligerSpawn.Commands
                 else if (subCommand == "where")
                 {
                     float closestDist = float.MaxValue;
-                    Entity closestZombie = null;
+                    Entity closestEnemy = null;
 
-                    foreach (KeyValuePair<int, string> kvp in ChunkDatenbank.ZombieUrsprung)
+                    foreach (Entity ent in GameManager.Instance.World.Entities.list)
                     {
-                        if (GameManager.Instance.World.Entities.dict.TryGetValue(kvp.Key, out Entity ent))
+                        if ((ent is EntityEnemy || ent is EntityZombie) && ent.IsAlive())
                         {
-                            if (ent.IsAlive())
+                            float dist = Vector3.Distance(player.position, ent.position);
+                            if (dist < closestDist)
                             {
-                                float dist = Vector3.Distance(player.position, ent.position);
-                                if (dist < closestDist)
-                                {
-                                    closestDist = dist;
-                                    closestZombie = ent;
-                                }
+                                closestDist = dist;
+                                closestEnemy = ent;
                             }
                         }
                     }
 
-                    if (closestZombie != null)
+                    if (closestEnemy != null)
                     {
-                        NavObjectManager.Instance.RegisterNavObject("tracking", closestZombie, "", false);
-                        UnityEngine.Debug.Log($"[ES Spawner] Nächster Zombie (ID: {closestZombie.entityId}) ist {Mathf.RoundToInt(closestDist)}m entfernt. Kompass-Markierung gesetzt!");
+                        // 1. Wir suchen dynamisch eine NavObject-Klasse, die existiert und KEINE Bedingungen hat
+                        string magicClassName = "supply_drop"; // Fallback, falls die Schleife fehlschlägt
+                        if (NavObjectClass.NavObjectClassList != null)
+                        {
+                            foreach (NavObjectClass noc in NavObjectClass.NavObjectClassList)
+                            {
+                                // Suchen nach: Bedingung = None UND hat Kompass-Einstellungen
+                                if (noc.RequirementType == NavObjectClass.RequirementTypes.None && noc.CompassSettings != null)
+                                {
+                                    magicClassName = noc.NavObjectClassName;
+                                    break; // Wir haben eine perfekte Klasse gefunden, Schleife abbrechen!
+                                }
+                            }
+                        }
+
+                        // 2. Wir kapern diese gefundene Klasse, nutzen .transform für den Bypass und zwingen das rote Icon auf
+                        NavObjectManager.Instance.RegisterNavObject(magicClassName, closestEnemy.transform, "ui_game_symbol_enemy_dot", false);
+
+                        UnityEngine.Debug.Log($"[ES Spawner] Universal-Radar: Nächster Feind (Typ: {closestEnemy.GetType().Name}, ID: {closestEnemy.entityId}) ist {Mathf.RoundToInt(closestDist)}m entfernt.");
+                        UnityEngine.Debug.Log($"[ES Spawner] Marker erfolgreich über Systemklasse '{magicClassName}' gesetzt!");
                     }
                     else
                     {
-                        UnityEngine.Debug.Log("[ES Spawner] Keine aktiven ES-Zombies in deiner Nähe gefunden.");
+                        UnityEngine.Debug.Log("[ES Spawner] Universal-Radar: Keine lebenden Feinde in deinem geladenen Umfeld gefunden.");
                     }
-                } // HIER hat die schließende Klammer gefehlt!
+                }
                 else
                 {
-                    UnityEngine.Debug.Log("Unbekannter Befehl. Bitte nutze 'es range', 'es spawn' oder 'es where'.");
+                    UnityEngine.Debug.Log("Bitte nutze 'es range', 'es spawn' oder 'es where'.");
                 }
-            }
-            else
-            {
-                UnityEngine.Debug.Log("Bitte nutze 'es range', 'es spawn' oder 'es where'.");
             }
         }
     }

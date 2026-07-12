@@ -163,10 +163,24 @@ namespace EinmaligerSpawn.Manager
                                     ChunkDatenbank.ZombieUrsprung[zombie.entityId] = chunkId;
                                     gespawnteZombies++;
 
-                                    // HIER: Marker nur beim Konsolenbefehl setzen
+                                    // HIER: Dynamischer Marker nur beim Konsolenbefehl setzen
                                     if (isManualCommand)
                                     {
-                                        NavObjectManager.Instance.RegisterNavObject("tracking", zombie, "", false);
+                                        string magicClassName = "supply_drop"; // Fallback
+                                        if (NavObjectClass.NavObjectClassList != null)
+                                        {
+                                            foreach (NavObjectClass noc in NavObjectClass.NavObjectClassList)
+                                            {
+                                                if (noc.RequirementType == NavObjectClass.RequirementTypes.None && noc.CompassSettings != null)
+                                                {
+                                                    magicClassName = noc.NavObjectClassName;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        // Wir nutzen .transform für den Quest-Bypass und überschreiben das Icon auf Rot
+                                        NavObjectManager.Instance.RegisterNavObject(magicClassName, zombie.transform, "ui_game_symbol_enemy_dot", false);
                                     }
                                 }
                             }
@@ -178,7 +192,6 @@ namespace EinmaligerSpawn.Manager
 
                         if (gespawnteZombies > 0)
                         {
-                            // Getrennte Log-Ausgaben für Manuell (mit Marker-Hinweis) und Auto
                             if (isManualCommand)
                             {
                                 UnityEngine.Debug.LogWarning($"{logPrefix} GEFAHR! Spawn für '{player.EntityName}' erfolgreich in {chunkId}. Marker wurde(n) gesetzt!");

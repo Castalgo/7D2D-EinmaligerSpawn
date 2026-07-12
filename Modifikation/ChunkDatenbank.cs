@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using UnityEngine;
+using System.Linq;
 
 namespace EinmaligerSpawn.Manager
 {
@@ -57,9 +58,14 @@ namespace EinmaligerSpawn.Manager
             {
                 try
                 {
-                    string json = File.ReadAllText(path);
-                    ToteZombiesProChunk = JsonConvert.DeserializeObject<Dictionary<string, int>>(json) ?? new Dictionary<string, int>();
-                    Debug.Log($"[EinmaligerSpawn] {ToteZombiesProChunk.Count} Chunk-Daten geladen.");
+                    // Nutzt IntroSort: Wandelt das Dictionary intern in ein flaches Array um, 
+                    // sortiert es extrem schnell und speicherschonend, und erstellt ein neues Dictionary für den Export.
+                    var sortedChunks = ToteZombiesProChunk
+                        .OrderBy(kvp => kvp.Key)
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+                    string json = JsonConvert.SerializeObject(sortedChunks, Formatting.Indented);
+                    File.WriteAllText(path, json);
                 }
                 catch (Exception e)
                 {
@@ -77,7 +83,12 @@ namespace EinmaligerSpawn.Manager
             try
             {
                 string path = Path.Combine(saveDir, "ausgerotteteChunks.json");
-                string json = JsonConvert.SerializeObject(ToteZombiesProChunk, Formatting.Indented);
+
+                // Wir erstellen eine sortierte Kopie. SortedDictionary sortiert Strings alphabetisch.
+                var sortedChunks = new SortedDictionary<string, int>(ToteZombiesProChunk);
+
+                // Wir serialisieren die sortierte Kopie, nicht das Original
+                string json = JsonConvert.SerializeObject(sortedChunks, Formatting.Indented);
                 File.WriteAllText(path, json);
             }
             catch (Exception e)
