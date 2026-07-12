@@ -3,8 +3,8 @@ The mod tracks when you have cleared a chunk or POI of zombies and prevents them
 
 Mod in Alpha stage:
 This is the first playable alpha version of the mod.
-I ran some tests during development, but for now, I’ve only tested the current state.
-At the moment, it still spawns hordes and the like, so it only interrupts certain parts of the respawns.
+I conducted some tests during development, but so far I have only tested the current build.
+The mandatory Sandbox settings required for the mod to function as intended have not yet been specified.
 
 Installing the mod:
 If you want to test the mod yourself, you can place the `Mods/EinmaligerSpawn` folder ( https://github.com/Castalgo/7D2D-EinmaligerSpawn/tree/main/Mods/EinmaligerSpawn ) into your mods folder at `C:\Users\yourCurrentUserprofilename\AppData\Roaming\7DaysToDie\Mods\`.
