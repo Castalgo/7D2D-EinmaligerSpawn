@@ -6,7 +6,8 @@ POI-Quests brechen das System, weil sie Zombies neu erschaffen, auch wenn Chunks
 
 [Sandbox-Einstellungen: Empfohlen]
 Müssen zwingend vom User korrekt gesetzt werden. Folgende Voreinstellungen sind für die Nutzung empfohlen:
-SaNdBoXcOdE
+ABBDBGFBHABLABWACHAEXGFCCFFAFKAEPAETK
 
 [Sandbox-Einstellungen: Minimaleinstellungen]
 Diese Einstellungen stellen das Minimum für ein funktionierendes Spielerlebnis dar:
+ABWACHA
