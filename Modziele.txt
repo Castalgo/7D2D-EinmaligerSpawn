@@ -18,3 +18,9 @@ Ziele der Mod zzz_EinmaligerSpawn (Version 3.x.x)
 - Ziel 4: Beim Verlassen eines Chunks werden die dort lebenden Biom-Zombies nicht gelöscht, sondern ihr Vorhandensein wird im Chunk-Datensatz gespeichert.
   Kehrt der Spieler zurück, werden genau diese verbliebenen Zombies im Chunk reaktiviert (sie dürfen dabei die Position leicht verändert haben).
   Wird ein Zombie getötet, ist er permanent aus diesem Chunk-Pool entfernt. Die Wildnis ist somit dauerhaft ausrottbar.
+  
+  
+ToDo für Programmierung
+----------------------------------------------------------------
+- "es map": Symbole sparen durch Verschmelzung
+- "es easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen

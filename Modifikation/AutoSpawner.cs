@@ -7,8 +7,8 @@ namespace EinmaligerSpawn.Manager
     public static class AutoSpawner
     {
         private static float timeSinceLastCheck = 0f;
-        private const float CHECK_INTERVAL = 30f;
-        private const int GLOBAL_ZOMBIE_LIMIT = 8;
+
+        // Konstanten für Limit und Zeit entfernt! Wir nutzen nun ModEinstellungen.
 
         public static void OnGameUpdate()
         {
@@ -16,7 +16,9 @@ namespace EinmaligerSpawn.Manager
                 return;
 
             timeSinceLastCheck += Time.deltaTime;
-            if (timeSinceLastCheck < CHECK_INTERVAL)
+
+            // NEU: Zugriff auf die Config für den Timer
+            if (timeSinceLastCheck < ModEinstellungen.SpawnCheckIntervall)
                 return;
 
             timeSinceLastCheck = 0f;
@@ -30,19 +32,21 @@ namespace EinmaligerSpawn.Manager
                 }
             }
 
-            if (currentZombies >= GLOBAL_ZOMBIE_LIMIT)
+            // NEU: Zugriff auf die Config für das Limit
+            if (currentZombies >= ModEinstellungen.GlobalesZombieLimit)
             {
                 return;
             }
 
-            UnityEngine.Debug.Log($"[AutoSpawner] Globale Zombies ({currentZombies}/{GLOBAL_ZOMBIE_LIMIT}). Feuere Spawn-Welle für alle {GameManager.Instance.World.Players.list.Count} Spieler ab...");
+            UnityEngine.Debug.Log($"[AutoSpawner] Globale Zombies ({currentZombies}/{ModEinstellungen.GlobalesZombieLimit}). Feuere Spawn-Welle für alle {GameManager.Instance.World.Players.list.Count} Spieler ab...");
 
             foreach (EntityPlayer player in GameManager.Instance.World.Players.list)
             {
-                // Welle feuert automatisch 1 Zombie pro Spieler ab (isManualCommand = false)
                 FuehreSpawnAus(player, 1, false);
             }
         }
+
+        // ... ab hier folgt unverändert deine FuehreSpawnAus(...) Methode
 
         public static void FuehreSpawnAus(EntityPlayer player, int requestedZombies, bool isManualCommand)
         {
@@ -57,15 +61,27 @@ namespace EinmaligerSpawn.Manager
                 UnityEngine.Debug.Log($"{logPrefix} Starte aktiven Spawn-Check um Zentrum {playerChunkX}_{playerChunkZ} für {requestedZombies} Zombie(s)...");
             }
 
+            // OPTIMIERUNG 1: Marker-Klasse nur EINMAL ganz am Anfang ermitteln
+            string magicClassName = "supply_drop";
+            if (isManualCommand && NavObjectClass.NavObjectClassList != null)
+            {
+                foreach (NavObjectClass noc in NavObjectClass.NavObjectClassList)
+                {
+                    if (noc.RequirementType == NavObjectClass.RequirementTypes.None && noc.CompassSettings != null)
+                    {
+                        magicClassName = noc.NavObjectClassName;
+                        break;
+                    }
+                }
+            }
+
             int radius = 5;
-            int zombieClassID = EntityClass.FromString("zombieArlene");
             GameRandom rand = GameManager.Instance.World.GetGameRandom();
 
             for (int x = -radius; x <= radius; x++)
             {
                 for (int z = -radius; z <= radius; z++)
                 {
-                    // 3x3 Zentrum um den Spieler ignorieren
                     if (Mathf.Abs(x) <= 1 && Mathf.Abs(z) <= 1)
                         continue;
 
@@ -93,6 +109,16 @@ namespace EinmaligerSpawn.Manager
                             continue;
                         }
 
+                        // BIOM-DYNAMIK: Wir holen uns nur die Biom-Liste für diesen Chunk, würfeln aber noch nicht
+                        byte biomeId = chunk.GetBiomeId(8, 8);
+                        BiomeDefinition biome = GameManager.Instance.World.Biomes.GetBiome(biomeId);
+                        BiomeSpawnEntityGroupList groupList = null;
+
+                        if (biome != null && BiomeSpawningClass.list.ContainsKey(biome.m_sBiomeName))
+                        {
+                            groupList = BiomeSpawningClass.list[biome.m_sBiomeName];
+                        }
+
                         int gespawnteZombies = 0;
                         int poiCount = 0;
                         int waterCount = 0;
@@ -101,6 +127,26 @@ namespace EinmaligerSpawn.Manager
 
                         for (int zombieIdx = 0; zombieIdx < requestedZombies; zombieIdx++)
                         {
+                            // OPTIMIERUNG 2: Wir würfeln für JEDEN Zombie neu, um eine Klon-Armee zu vermeiden
+                            int zombieClassID = EntityClass.FromString("zombieArlene"); // Fallback
+
+                            if (groupList != null)
+                            {
+                                foreach (BiomeSpawnEntityGroupData groupData in groupList.list)
+                                {
+                                    if (EntityGroups.IsEnemyGroup(groupData.entityGroupName))
+                                    {
+                                        int lastClassId = 0;
+                                        int rolledId = EntityGroups.GetRandomFromGroup(groupData.entityGroupName, ref lastClassId, null);
+                                        if (rolledId != 0)
+                                        {
+                                            zombieClassID = rolledId;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
                             bool spawnFound = false;
                             Vector3 spawnPos = Vector3.zero;
 
@@ -128,6 +174,12 @@ namespace EinmaligerSpawn.Manager
                                 int worldZ = minZ + localZ;
 
                                 Vector3 checkPosVec = new Vector3(worldX, (float)y, worldZ);
+
+                                //// Vanilla-Mindestabstand erzwingen (28 Meter)
+                                //if (Vector3.Distance(checkPosVec, player.position) < 28f)
+                                //{
+                                //    continue;
+                                //}
 
                                 PrefabInstance prefab = GameManager.Instance.World.GetPOIAtPosition(checkPosVec, null, null);
                                 if (prefab != null)
@@ -163,23 +215,8 @@ namespace EinmaligerSpawn.Manager
                                     ChunkDatenbank.ZombieUrsprung[zombie.entityId] = chunkId;
                                     gespawnteZombies++;
 
-                                    // HIER: Dynamischer Marker nur beim Konsolenbefehl setzen
                                     if (isManualCommand)
                                     {
-                                        string magicClassName = "supply_drop"; // Fallback
-                                        if (NavObjectClass.NavObjectClassList != null)
-                                        {
-                                            foreach (NavObjectClass noc in NavObjectClass.NavObjectClassList)
-                                            {
-                                                if (noc.RequirementType == NavObjectClass.RequirementTypes.None && noc.CompassSettings != null)
-                                                {
-                                                    magicClassName = noc.NavObjectClassName;
-                                                    break;
-                                                }
-                                            }
-                                        }
-
-                                        // Wir nutzen .transform für den Quest-Bypass und überschreiben das Icon auf Rot
                                         NavObjectManager.Instance.RegisterNavObject(magicClassName, zombie.transform, "ui_game_symbol_enemy_dot", false);
                                     }
                                 }
@@ -225,7 +262,7 @@ namespace EinmaligerSpawn.Manager
                                 ChunkDatenbank.ToteZombiesProChunk[chunkId] = 1;
                             }
 
-                            UnityEngine.Debug.Log($"{logPrefix} Chunk {chunkId} wurde bei '{player.EntityName}' automatisch als gesäubert markiert.");
+                            UnityEngine.Debug.LogWarning($"{logPrefix} Chunk {chunkId} wurde bei '{player.EntityName}' automatisch als gesäubert markiert.");
                         }
                     }
                 }

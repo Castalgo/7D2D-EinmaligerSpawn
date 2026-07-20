@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using EinmaligerSpawn.Manager;
 using HarmonyLib;
-using EinmaligerSpawn.Manager;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace EinmaligerSpawn.Patches
@@ -8,70 +9,150 @@ namespace EinmaligerSpawn.Patches
     [HarmonyPatch(typeof(EntityAlive), "SetDead")]
     public class TodesListener_Patch
     {
-        [HarmonyPostfix]
-        public static void Postfix(EntityAlive __instance)
+        // NEU: Wir schalten uns VOR die Engine-Logik
+        [HarmonyPrefix]
+        public static void Prefix(EntityAlive __instance, out bool __state)
         {
-            // Prüfen: Ist es ein Zombie UND steht er in unserem Gedächtnis?
-            if (__instance is EntityZombie && ChunkDatenbank.ZombieUrsprung.ContainsKey(__instance.entityId))
+            // Merken, ob der Zombie VOR diesem Aufruf bereits tot war (!IsAlive bedeutet tot)
+            __state = !__instance.IsAlive();
+        }
+
+        // Wir fangen das __state Ergebnis aus dem Prefix hier auf
+        [HarmonyPostfix]
+        public static void Postfix(EntityAlive __instance, bool __state)
+        {
+            // ENGINE-QUIRK FIX: Wenn der Zombie vorher schon tot war -> SOFORT ABBRECHEN!
+            // Das verhindert, dass Ragdoll- oder Fallschaden die Belohnungen doppelt triggern.
+            if (__state) return;
+
+            // Abbruch, wenn der taktische Kill in der Config deaktiviert ist
+            if (!ModEinstellungen.TaktischerKillAktiv) return;
+
+            // Prüfen: Ist es überhaupt ein Zombie? (Egal ob Biom, POI oder geladen)
+            if (__instance is EntityEnemy || __instance is EntityZombie)
             {
-                // ---------------------------------------------------------
-                // SCHRITT 1: Der Ursprung (Die alte Heimat verriegeln)
-                // ---------------------------------------------------------
-                string ursprungsChunk = ChunkDatenbank.ZombieUrsprung[__instance.entityId];
-                ChunkDatenbank.AddToterZombieNachID(ursprungsChunk, DynamischesSpawnLimit.MaxKills);
-
-                // Zombie aus dem Gedächtnis löschen (Er ist ja jetzt tot)
-                ChunkDatenbank.ZombieUrsprung.Remove(__instance.entityId);
-
-
-                // ---------------------------------------------------------
-                // SCHRITT 2: Der Todes-Chunk (Taktische Säuberung)
-                // ---------------------------------------------------------
+                // 1. Chunk-Koordinaten des Todesortes berechnen
                 Vector3 todesPos = __instance.position;
-
-                // Chunk-Koordinaten des Todesortes berechnen
                 int tCx = Utils.Fastfloor(todesPos.x / 16f);
                 int tCz = Utils.Fastfloor(todesPos.z / 16f);
                 string todesChunkId = $"{tCx}_{tCz}";
 
-                // Wir prüfen das Schlachtfeld nur, wenn der Todesort NICHT der Ursprungsort ist.
-                // (Wäre es derselbe Chunk, hat Schritt 1 ihn ja ohnehin gerade verriegelt).
-                if (ursprungsChunk != todesChunkId)
+                string ursprungsChunk;
+
+                // 2. Woher kommt der Zombie?
+                if (ChunkDatenbank.ZombieUrsprung.TryGetValue(__instance.entityId, out ursprungsChunk))
                 {
-                    // Wir bauen eine virtuelle Box, die exakt 16x16 Meter groß ist (genau 1 Chunk) 
-                    // und unendlich hoch/tief (256 Meter), platziert in der Mitte des Todes-Chunks.
-                    float centerX = (tCx * 16f) + 8f;
-                    float centerZ = (tCz * 16f) + 8f;
-                    Bounds chunkBounds = new Bounds(new Vector3(centerX, 128f, centerZ), new Vector3(16f, 256f, 16f));
+                    // Er stammt aus unserem regulären Biom-Spawn -> Aus dem RAM löschen
+                    ChunkDatenbank.ZombieUrsprung.Remove(__instance.entityId);
+                }
+                else
+                {
+                    // Er ist ein POI-Zombie, ein geladener Zombie oder Blutmond-Zombie
+                    // -> Wir deklarieren seinen Todesort zu seiner Heimat.
+                    ursprungsChunk = todesChunkId;
+                }
 
-                    // NATIVE ENGINE-ABFRAGE: Wer lebt in dieser Box, AUSSER dem Zombie, der gerade stirbt?
-                    List<EntityAlive> lebendeEntitaeten = GameManager.Instance.World.GetLivingEntitiesInBounds(__instance, chunkBounds);
+                // 3. REGEL 1: Den regulären Kill IMMER im Ursprungs-Chunk verbuchen
+                ChunkDatenbank.AddToterZombieNachID(ursprungsChunk, 1);
 
-                    bool weitereFeindeVorhanden = false;
+                // ---------------------------------------------------------
+                // GLOBALE PRÜFUNG: Ist exakt DIESER Chunk jetzt feindfrei?
+                // ---------------------------------------------------------
+                float centerX = (tCx * 16f) + 8f;
+                float centerZ = (tCz * 16f) + 8f;
+                Bounds todesBounds = new Bounds(new Vector3(centerX, 128f, centerZ), new Vector3(16f, 256f, 16f));
 
-                    if (lebendeEntitaeten != null)
+                List<EntityAlive> lebendeEntitaeten = GameManager.Instance.World.GetLivingEntitiesInBounds(__instance, todesBounds);
+                if (lebendeEntitaeten != null)
+                {
+                    foreach (EntityAlive ent in lebendeEntitaeten)
                     {
-                        foreach (EntityAlive ent in lebendeEntitaeten)
+                        if ((ent is EntityEnemy || ent is EntityZombie) && ent.IsAlive())
                         {
-                            // Wir ignorieren Tiere oder Mitspieler, uns interessieren nur Feinde
-                            if (ent is EntityEnemy || ent is EntityZombie)
+                            // REGEL 2: Wenn noch ein Feind in diesem Chunk steht -> Sofortiger Abbruch!
+                            // Der Kill zählt somit NUR am Ursprungsort.
+                            return;
+                        }
+                    }
+                }
+
+                // REGEL 3: Ab hier ist sicher: Der Todes-Chunk ist zu 100% leergeräumt!
+                // Der Bonus-Kill (die Flächensäuberung) wird jetzt verteilt.
+                // ---------------------------------------------------------
+
+                if (ursprungsChunk == todesChunkId)
+                {
+                    // ---------------------------------------------------------
+                    // SZENARIO A: Zombie (Biom oder POI) stirbt restlos in seiner Heimat
+                    // -> Wir prüfen die 8 Nachbarn und schenken dem Spieler einen
+                    // ---------------------------------------------------------
+                    int[][] nachbarnOffsets = new int[][]
+                    {
+                        new int[] {-1, -1}, new int[] {0, -1}, new int[] {1, -1},
+                        new int[] {-1, 0},                     new int[] {1, 0},
+                        new int[] {-1, 1},  new int[] {0, 1},  new int[] {1, 1}
+                    };
+
+                    foreach (var offset in nachbarnOffsets)
+                    {
+                        int nX = tCx + offset[0];
+                        int nZ = tCz + offset[1];
+                        string nachbarId = $"{nX}_{nZ}";
+
+                        // Hat der Nachbar-Chunk schon eine Historie?
+                        if (ChunkDatenbank.ToteZombiesProChunk.ContainsKey(nachbarId) && ChunkDatenbank.ToteZombiesProChunk[nachbarId] >= 1)
+                        {
+                            continue; // nächstes Element von foreach
+                        }
+
+                        // Bounds für DIESEN Nachbar-Chunk bauen
+                        float nCenterX = (nX * 16f) + 8f;
+                        float nCenterZ = (nZ * 16f) + 8f;
+                        Bounds nachbarBounds = new Bounds(new Vector3(nCenterX, 128f, nCenterZ), new Vector3(16f, 256f, 16f));
+
+                        List<EntityAlive> lebendeNachbarn = GameManager.Instance.World.GetLivingEntitiesInBounds(__instance, nachbarBounds);
+                        bool hatAktiveFeinde = false;
+
+                        // lebt noch wer im Chunk?
+                        if (lebendeNachbarn != null)
+                        {
+                            foreach (EntityAlive ent in lebendeNachbarn)
                             {
-                                weitereFeindeVorhanden = true;
-                                break;
+                                if ((ent is EntityEnemy || ent is EntityZombie) && ent.IsAlive())
+                                {
+                                    hatAktiveFeinde = true;
+                                    break; // Abbruch der Schleife
+                                }
                             }
+                        }
+
+                        if (!hatAktiveFeinde)
+                        {
+                            // Die Datenbank übernimmt jetzt das Speichern, die Map und den Chat
+                            ChunkDatenbank.VerbucheTaktischenKill(nachbarId, true);
+
+                            return; // Nachbar belohnt -> Fertig!
                         }
                     }
 
-                    // Belohnung für den Spieler: Das Gebiet ist komplett feindfrei!
-                    if (!weitereFeindeVorhanden)
+                    // FALLBACK SZENARIO A: Kein leerer Nachbar gefunden.
+                    // Todes-Chunk bekommt den Bonus-Kill (geht somit z. B. von 0 auf 2)
+                    ChunkDatenbank.ToteZombiesProChunk[todesChunkId]++;
+                }
+                else
+                {
+                    // ---------------------------------------------------------
+                    // SZENARIO B: Gekitet! Zombie stirbt restlos in einem FREMDEN Chunk
+                    // -> Der Todes-Chunk bekommt den Bonus-Kill.
+                    // ---------------------------------------------------------
+                    if (!ChunkDatenbank.ToteZombiesProChunk.ContainsKey(todesChunkId) || ChunkDatenbank.ToteZombiesProChunk[todesChunkId] < 1)
                     {
-                        if (!ChunkDatenbank.ToteZombiesProChunk.ContainsKey(todesChunkId))
-                        {
-                            ChunkDatenbank.ToteZombiesProChunk[todesChunkId] = 0;
-                            Debug.LogWarning($"[EinmaligerSpawn] Taktischer Clear! Chunk {todesChunkId} wurde durch Flächensäuberung gesichert.");
-                        }
-                        
-                        // Stumpf +1 addieren, egal wie hoch der Wert schon ist
+                        // Die Datenbank übernimmt das Setzen auf 1, Map-Update und den Chat
+                        ChunkDatenbank.VerbucheTaktischenKill(todesChunkId, false);
+                    }
+                    else
+                    {
+                        // Chunk war ohnehin schon clear -> Er bekommt einfach den Bonus-Kill addiert
                         ChunkDatenbank.ToteZombiesProChunk[todesChunkId]++;
                     }
                 }

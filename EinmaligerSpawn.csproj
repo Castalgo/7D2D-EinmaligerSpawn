@@ -67,7 +67,10 @@
     <Compile Include="Main.cs" />
     <Compile Include="Modifikation\BiomeSpawn_Kontrolle.cs" />
     <Compile Include="Modifikation\ChunkDatenbank.cs" />
+    <Compile Include="Modifikation\KartenOverlayManager.cs" />
     <Compile Include="Modifikation\KonsolenBefehle.cs" />
+    <Compile Include="Modifikation\LokalenChunkSaeubern.cs" />
+    <Compile Include="Modifikation\ModEinstellungen.cs" />
     <Compile Include="Modifikation\Trader_Quest_Filter_Patch.cs" />
     <Compile Include="Modifikation\POI_Sleeper_Kontrolle.cs" />
     <Compile Include="Modifikation\SpeichernLaden_Patch.cs" />
@@ -78,6 +81,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Config\nav_objects.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Config\quests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

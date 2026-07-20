@@ -14,6 +14,9 @@ namespace EinmaligerSpawn.Patches
             if (!string.IsNullOrEmpty(savePath))
             {
                 ChunkDatenbank.Save(savePath);
+
+                // Einstellungen für dieses Savegame speichern
+                ModEinstellungen.Speichern();
             }
         }
     }
@@ -29,11 +32,17 @@ namespace EinmaligerSpawn.Patches
             if (!string.IsNullOrEmpty(savePath))
             {
                 ChunkDatenbank.Load(savePath);
+
+                // Einstellungen für diese Welt laden
+                ModEinstellungen.Laden(savePath);
+
+                // Karte basierend auf den gerade geladenen Einstellungen aktualisieren
+                KartenOverlayManager.Wiederherstellen();
             }
         }
     }
 
-    // NEUER Patch für das dynamische Überschreiben der Spawns
+    // Patch für das dynamische Überschreiben der Spawns
     [HarmonyPatch(typeof(GameManager), "Update")]
     public class Patch_GameManager_Update
     {
@@ -48,7 +57,6 @@ namespace EinmaligerSpawn.Patches
             {
                 DynamischesSpawnLimit.IstInitialisiert = true; // Sperre aktivieren, damit es nur 1x läuft
 
-                // Hier rufen wir jetzt unser Master-Skript auf (statt der alten Diagnose)
                 DynamischesSpawnLimit.InitialisiereWerte();
             }
         }

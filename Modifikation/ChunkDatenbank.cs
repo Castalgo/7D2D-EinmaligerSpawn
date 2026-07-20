@@ -36,6 +36,59 @@ namespace EinmaligerSpawn.Manager
             if (ToteZombiesProChunk[chunkId] == abriegelungsLimit)
             {
                 Debug.LogWarning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
+
+                // Holt die aktuelle In-Game-Zeit (z.B. Tag 4, 14:35)
+                ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+                string feedbackMsg = $"[00FF00][{timeString}] Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet.[-]";
+                GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+
+                if (KartenOverlayManager.IstAktiv)
+                {
+                    KartenOverlayManager.ZeichneMarker(chunkId);
+                }
+
+            }
+        }
+
+        // Verarbeitet die taktischen Kills (Nachbar-Clear oder Gekitet) sauber an einem Ort
+        public static void VerbucheTaktischenKill(string chunkId, bool istNachbar)
+        {
+            // Sicherheitsprüfung: Falls der Chunk ohnehin schon leer ist, nur hochzählen
+            if (ToteZombiesProChunk.ContainsKey(chunkId) && ToteZombiesProChunk[chunkId] >= 1)
+            {
+                ToteZombiesProChunk[chunkId]++;
+                return;
+            }
+
+            // Chunk auf gesäubert setzen
+            ToteZombiesProChunk[chunkId] = 1;
+
+            // NEU: Live-Update für die Karte auslösen
+            if (KartenOverlayManager.IstAktiv)
+            {
+                KartenOverlayManager.ZeichneMarker(chunkId);
+            }
+
+            // Chatnachricht und Konsole vorbereiten
+            ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+            string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+            string feedbackMsg;
+
+            if (istNachbar)
+            {
+                Debug.LogWarning($"[EinmaligerSpawn] Taktischer Bonus: Nachbar {chunkId} zusätzlich gesichert!");
+                feedbackMsg = $"[00FF00][{timeString}] Flächensäuberungsbonus: Angrenzendes Gebiet {chunkId} clear.[-]";
+            }
+            else
+            {
+                Debug.LogWarning($"[EinmaligerSpawn] Taktischer Clear! Todes-Chunk {chunkId} wurde gesichert.");
+                feedbackMsg = $"[00FF00][{timeString}] Taktische Säuberung: Gebiet {chunkId} clear.[-]";
+            }
+
+            if (ModEinstellungen.ChatNachrichtenAktiv) // nur wenn die Chatnachrichten aktiviert sind, wird die Nachricht gesendet
+            {
+                GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
             }
         }
 

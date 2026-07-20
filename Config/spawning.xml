@@ -1,6 +1,5 @@
 <configs>
-	<!-- Kein Respawn in allen Biomen -->
-
+	<!-- Massiv erhöhter Respawn in allen NICHT geblockten Chunks -->
 	<!-- respawndelay für alle einzeln setzen -->
 	<set xpath="/spawning/biome/spawn[starts-with(@entitygroup, 'Zombies')]/@respawndelay">0.001</set>
 </configs>
