@@ -1,6 +1,7 @@
-﻿using EinmaligerSpawn.Manager;
+﻿using System.Reflection;
+using EinmaligerSpawn.LootBagMarker;
+using EinmaligerSpawn.Manager;
 using HarmonyLib;
-using System.Reflection;
 using UnityEngine;
 
 namespace EinmaligerSpawn
@@ -18,6 +19,8 @@ namespace EinmaligerSpawn
             ModEvents.GameUpdate.RegisterHandler((ref ModEvents.SGameUpdateData data) =>
             {
                 AutoSpawner.OnGameUpdate();
+                LokalenChunkSaeubern.OnGameUpdate();
+                LootbagMarkerManager.OnGameUpdate();
             });
 
             Debug.Log("[EinmaligerSpawn] Alle Patches erfolgreich geladen!");

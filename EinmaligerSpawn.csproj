@@ -70,6 +70,7 @@
     <Compile Include="Modifikation\KartenOverlayManager.cs" />
     <Compile Include="Modifikation\KonsolenBefehle.cs" />
     <Compile Include="Modifikation\LokalenChunkSaeubern.cs" />
+    <Compile Include="Modifikation\LootBagMarker.cs" />
     <Compile Include="Modifikation\ModEinstellungen.cs" />
     <Compile Include="Modifikation\Trader_Quest_Filter_Patch.cs" />
     <Compile Include="Modifikation\POI_Sleeper_Kontrolle.cs" />

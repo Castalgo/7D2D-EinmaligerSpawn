@@ -86,11 +86,14 @@ namespace EinmaligerSpawn.Manager
             }
         }
 
-        private static void LoescheAlleMarker()
+        public static void LoescheAlleMarker()
         {
-            foreach (var marker in aktiveMarker.Values)
+            if (NavObjectManager.Instance != null) // falls noch vorhanden, um NullReferenceException zu vermeiden
             {
-                NavObjectManager.Instance.UnRegisterNavObject(marker);
+                foreach (var marker in aktiveMarker.Values)
+                {
+                    NavObjectManager.Instance.UnRegisterNavObject(marker);
+                }
             }
             aktiveMarker.Clear();
         }

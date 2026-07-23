@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace EinmaligerSpawn.Manager
@@ -13,6 +14,8 @@ namespace EinmaligerSpawn.Manager
 
         private static Dictionary<int, TrackingDaten> spielerTracking = new Dictionary<int, TrackingDaten>();
 
+        private static float checkTimer = 0f; // Timer zum Drosseln der Update-Frequenz
+
         public static void OnGameUpdate()
         {
             // Abbruch, wenn das Feature über die Config deaktiviert wurde
@@ -21,6 +24,13 @@ namespace EinmaligerSpawn.Manager
 
             if (GameManager.Instance == null || GameManager.Instance.World == null || GameManager.Instance.World.Players == null)
                 return;
+
+            checkTimer += Time.deltaTime;
+            if (checkTimer < 0.5f)
+                return;
+
+            float vergangeneZeit = checkTimer;
+            checkTimer = 0f;
 
             foreach (EntityPlayer player in GameManager.Instance.World.Players.list)
             {
@@ -44,11 +54,13 @@ namespace EinmaligerSpawn.Manager
                     continue;
                 }
 
-                daten.ZeitImChunk += Time.deltaTime;
+                // HIER GEÄNDERT: Statt Time.deltaTime rechnen wir den angesammelten Block von z.B. 0.51 Sekunden drauf
+                daten.ZeitImChunk += vergangeneZeit;
 
                 if (daten.ZeitImChunk >= 4f)
                 {
                     bool erfolgreich = PruefeUndSaeubere(aktuellerChunk, player);
+                    // Den Timer nach einer Überprüfung zurücksetzen, auch wenn sie fehlschlug
                     daten.ZeitImChunk = 0f;
                 }
             }
@@ -87,6 +99,16 @@ namespace EinmaligerSpawn.Manager
             ChunkDatenbank.ToteZombiesProChunk[chunkId] = 1;
 
             UnityEngine.Debug.Log($"[EinmaligerSpawn] Walkthrough-Clear: Chunk {chunkId} wurde durch 4s friedliche Präsenz von '{player.EntityName}' gesäubert.");
+            
+
+            if (ModEinstellungen.ChatNachrichtenAktiv) // nur wenn die Chatnachrichten aktiviert sind, wird die Nachricht gesendet
+            {
+                // Chatnachricht
+                ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+                string feedbackMsg = $"[00FF00][{timeString}] Walkthrough-Clear: Chunk {chunkId} wurde von '{player.EntityName}' als gesäubert verifiziert.[-]";
+                GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+            }
 
             if (ModEinstellungen.KartenOverlayAktiv)
             {
@@ -94,6 +116,11 @@ namespace EinmaligerSpawn.Manager
             }
 
             return true;
+        }
+
+        public static void Reset()
+        {
+            spielerTracking.Clear();
         }
     }
 }

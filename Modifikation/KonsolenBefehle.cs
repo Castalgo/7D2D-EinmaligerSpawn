@@ -16,6 +16,7 @@ namespace EinmaligerSpawn.Commands
     "Nutze 'es range [x]' um dir anzeigen zu lassen, wie viele Chunks in deiner Umgebung noch spawnen dürfen,\n" +
     "Nutze 'es msg <on/off>' für globale Chat-Nachrichten,\n" +
     "Nutze 'es where' um den nähesten aktiven Zombie zu finden,\n" +
+    "Nutze 'es cheat_lootbagmarker <on/off>' um Radar-Marker auf LootBags setzen zu lassen." +
     "=== Einmaliger Spawn Admin-Befehle ===\n" +
     "Nutze 'es localclear <on/off>' für den autom. 4s-Clear beim Durchlaufen,\n" +
     "Nutze 'es tactical <on/off>' für den Bonus-Clear,\n" +
@@ -51,6 +52,9 @@ namespace EinmaligerSpawn.Commands
             {
                 case "cheat_clear":
                     CmdCheatClear(player, _params);
+                    break;
+                case "cheat_lootbagmarker":
+                    CmdCheatLootbagMarker(_params);
                     break;
                 case "cheat_spawn":
                     CmdCheatSpawn(player, _params, _senderInfo);
@@ -158,6 +162,36 @@ namespace EinmaligerSpawn.Commands
             UnityEngine.Debug.LogWarning($"[ES Spawner] Ich habe {totalChecked} Chunks geprüft und {newlyCleared} neu ausgerottet.");
         }
 
+        // -----------------------------------------------------------------
+        // BEFEHL: es cheat_lootbagmarker <on / off>
+        // -----------------------------------------------------------------
+        private void CmdCheatLootbagMarker(List<string> _params)
+        {
+            // Da LootbagMarkerManager im neuen Namespace liegt, sprechen wir ihn direkt voll qualifiziert an 
+            // (oder du fügst oben "using EinmaligerSpawn.LootBagMarker;" hinzu)
+            string currentStatus = EinmaligerSpawn.LootBagMarker.LootbagMarkerManager.IstAktiv ? "ON" : "OFF";
+
+            if (_params.Count < 2)
+            {
+                UnityEngine.Debug.LogWarning($"Aktueller Status (Lootbag-Marker): {currentStatus}. Bitte nutze 'es cheat_lootbagmarker on' oder 'es cheat_lootbagmarker off'.");
+                return;
+            }
+
+            string state = _params[1].ToLower();
+
+            if (state == "on" || state == "true")
+            {
+                EinmaligerSpawn.LootBagMarker.LootbagMarkerManager.SetzeModus(true);
+            }
+            else if (state == "off" || state == "false")
+            {
+                EinmaligerSpawn.LootBagMarker.LootbagMarkerManager.SetzeModus(false);
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es cheat_lootbagmarker on' oder 'es cheat_lootbagmarker off'.");
+            }
+        }
         // -----------------------------------------------------------------
         // BEFEHL: es cheat_spawn
         // -----------------------------------------------------------------

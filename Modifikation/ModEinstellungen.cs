@@ -7,14 +7,13 @@ namespace EinmaligerSpawn.Manager
 {
     public static class ModEinstellungen
     {
-        public static bool KartenOverlayAktiv = false;
-        public static bool TaktischerKillAktiv = true;
         public static bool ChatNachrichtenAktiv = true;
-        public static bool LokalerChunkClearAktiv = true;
-
-        // NEU: Die konfigurierbaren Werte für den Autospawner
         public static int GlobalesZombieLimit = 18;
+        public static bool KartenOverlayAktiv = false; 
+        public static bool LokalerChunkClearAktiv = true;
+        public static bool LootbagMarkerAktiv = false;
         public static float SpawnCheckIntervall = 15f;
+        public static bool TaktischerKillAktiv = true;
 
         public static void Laden(string saveDir)
         {
@@ -27,14 +26,13 @@ namespace EinmaligerSpawn.Manager
                     var config = JsonConvert.DeserializeObject<ConfigDaten>(json);
                     if (config != null)
                     {
-                        KartenOverlayAktiv = config.KartenOverlayAktiv;
-                        TaktischerKillAktiv = config.TaktischerKillAktiv;
                         ChatNachrichtenAktiv = config.ChatNachrichtenAktiv;
-
-                        // NEU
                         GlobalesZombieLimit = config.GlobalesZombieLimit;
-                        SpawnCheckIntervall = config.SpawnCheckIntervall;
+                        KartenOverlayAktiv = config.KartenOverlayAktiv;
                         LokalerChunkClearAktiv = config.LokalerChunkClearAktiv;
+                        LootbagMarkerAktiv = config.LootbagMarkerAktiv;
+                        SpawnCheckIntervall = config.SpawnCheckIntervall;
+                        TaktischerKillAktiv = config.TaktischerKillAktiv;
                     }
                 }
                 catch (Exception e)
@@ -45,12 +43,13 @@ namespace EinmaligerSpawn.Manager
             else
             {
                 // Standardwerte, falls noch keine Config existiert
-                KartenOverlayAktiv = false;
-                TaktischerKillAktiv = true;
                 ChatNachrichtenAktiv = true;
-                LokalerChunkClearAktiv = true;
                 GlobalesZombieLimit = 18;
+                KartenOverlayAktiv = false; 
+                LokalerChunkClearAktiv = true;
+                LootbagMarkerAktiv = false;
                 SpawnCheckIntervall = 15f;
+                TaktischerKillAktiv = true;
             }
         }
 
@@ -64,12 +63,13 @@ namespace EinmaligerSpawn.Manager
             {
                 var config = new ConfigDaten
                 {
-                    KartenOverlayAktiv = KartenOverlayAktiv,
-                    TaktischerKillAktiv = TaktischerKillAktiv,
                     ChatNachrichtenAktiv = ChatNachrichtenAktiv,
                     GlobalesZombieLimit = GlobalesZombieLimit,
-                    SpawnCheckIntervall = SpawnCheckIntervall,
+                    KartenOverlayAktiv = KartenOverlayAktiv,
                     LokalerChunkClearAktiv = LokalerChunkClearAktiv,
+                    LootbagMarkerAktiv = LootbagMarkerAktiv,
+                    SpawnCheckIntervall = SpawnCheckIntervall,
+                    TaktischerKillAktiv = TaktischerKillAktiv,
                 };
                 string json = JsonConvert.SerializeObject(config, Formatting.Indented);
                 File.WriteAllText(configPfad, json);
@@ -82,14 +82,13 @@ namespace EinmaligerSpawn.Manager
 
         private class ConfigDaten
         {
-            public bool KartenOverlayAktiv { get; set; }
-            public bool TaktischerKillAktiv { get; set; } = true;
             public bool ChatNachrichtenAktiv { get; set; } = true;
-            public bool LokalerChunkClearAktiv { get; set; } = true;
-
-            // NEU: Standardwerte für die Serialisierung
             public int GlobalesZombieLimit { get; set; } = 18;
+            public bool KartenOverlayAktiv { get; set; }
+            public bool LokalerChunkClearAktiv { get; set; } = true;
+            public bool LootbagMarkerAktiv { get; set; } = false;
             public float SpawnCheckIntervall { get; set; } = 15f;
+            public bool TaktischerKillAktiv { get; set; } = true;
         }
     }
 }
