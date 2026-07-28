@@ -9,7 +9,7 @@ namespace EinmaligerSpawn.Config
     {
         public static bool ChatNachrichtenAktiv = true;
         public static int GlobalesZombieLimit = 18;
-        public static bool KartenOverlayAktiv = false; 
+        public static bool KartenOverlayAktiv = true; 
         public static bool LokalerChunkClearAktiv = true;
         public static bool LootbagMarkerAktiv = false;
         public static float SpawnCheckIntervall = 5f;
@@ -45,10 +45,10 @@ namespace EinmaligerSpawn.Config
                 // Standardwerte, falls noch keine Config existiert
                 ChatNachrichtenAktiv = true;
                 GlobalesZombieLimit = 18;
-                KartenOverlayAktiv = false; 
+                KartenOverlayAktiv = true; 
                 LokalerChunkClearAktiv = true;
                 LootbagMarkerAktiv = false;
-                SpawnCheckIntervall = 15f;
+                SpawnCheckIntervall = 5f;
                 TaktischerKillAktiv = true;
             }
         }
@@ -84,7 +84,7 @@ namespace EinmaligerSpawn.Config
         {
             public bool ChatNachrichtenAktiv { get; set; } = true;
             public int GlobalesZombieLimit { get; set; } = 18;
-            public bool KartenOverlayAktiv { get; set; }
+            public bool KartenOverlayAktiv { get; set; } = true;
             public bool LokalerChunkClearAktiv { get; set; } = true;
             public bool LootbagMarkerAktiv { get; set; } = false;
             public float SpawnCheckIntervall { get; set; } = 15f;
