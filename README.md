@@ -1,67 +1,70 @@
-# EinmaligerSpawn (für 7D2D Version 3.x.x)
+🌐 [English](README.md) | 🇩🇪 [Deutsch](README_DE.md)
+---
 
-## Über diese Mod
-Die Mod registriert, wenn du einen Chunk oder ein POI von Zombies gesäubert hast, und verhindert dauerhaft, dass sie in diesem Chunk respawnen. 
-Aktuell befindet sich das Projekt in der Alpha-Phase (es ist die erste spielbare Alpha-Version) und wurde bisher nur im aktuellen Build getestet.
+# EinmaligerSpawn (for 7D2D Version 3.x.x)
+
+## About this mod
+The mod tracks when you have cleared a chunk or a POI of zombies and permanently prevents them from respawning in that chunk. 
+Currently, the project is in its alpha phase (this is the first playable alpha version) and has only been tested on the current build.
 
 ## Installation
-Platziere den Ordner `Mods/EinmaligerSpawn` einfach in deinem Mod-Verzeichnis unter `C:\Users\yourCurrentUserprofilename\AppData\Roaming\7DaysToDie\Mods\`.
+Simply place the `Mods/EinmaligerSpawn` folder into your mod directory at `C:\Users\yourCurrentUserprofilename\AppData\Roaming\7DaysToDie\Mods\`.
 
 ---
 
-## Der AutoSpawner
-Die Mod beinhaltet einen komplett eigenen AutoSpawner. Dieser wurde hinzugefügt, da das Vanilla-Spawnsystem des Spiels oft zu langsam und passiv agiert, wenn zu viele Bereiche um einen herum keinen Spawn mehr erlauben. Der Spawner sorgt dafür, dass die Welt um dich herum trotzdem bevölkert ist.
-*   **Standard-Verhalten:** Die Mod prüft standardmäßig alle 5 Sekunden, ob neue Zombies benötigt werden, und hält ein globales Limit von maximal 18 aktiven Zombies aufrecht.
-*   **Anpassbarkeit:** Du kannst diese Werte jederzeit im Spiel über die Konsolenbefehle `es timer <Sekunden>` und `es limit <Zahl>` an deine Vorlieben oder Serverleistung anpassen.
+## The AutoSpawner
+The mod includes its own custom AutoSpawner. This was added because the vanilla spawn system often acts too slowly and passively when too many areas around you no longer allow spawns. The spawner ensures that the world around you remains populated.
+*   **Default Behavior:** By default, the mod checks every 5 seconds if new zombies are needed and maintains a global limit of a maximum of 18 active zombies.
+*   **Customizability:** You can adjust these values at any time in-game using the console commands `es timer <seconds>` and `es limit <number>` to suit your preferences or server performance.
 
 ---
 
-## Die Clear-Mechaniken (Wie Chunks gesäubert werden)
-Du hast verschiedene Möglichkeiten, wie ein Chunk in der Mod als "ausgerottet" markiert wird. Fast alle dieser Mechaniken können individuell modifiziert oder ganz abgeschaltet werden, da die Einstellungen im Spielstand-Ordner in der `ModConfig.json` gespeichert werden.
+## Clear Mechanics (How chunks are cleared)
+You have several ways to mark a chunk as "cleared" in the mod. Almost all of these mechanics can be individually modified or completely disabled, as the settings are saved in the `ModConfig.json` within your savegame folder.
 
-1.  **Ursprungsort (Der Standard-Clear)**
-    Tötest du einen von der Mod gespawnten Zombie, wird sofort der Chunk gesäubert, aus dem dieser Zombie ursprünglich stammte.
-2.  **Todesort (Taktischer Kill / Kiting)**
-    Zusätzlich zum Ursprungsort belohnt dich die Mod, wenn du taktisch spielst. Ziehst (kitest) du einen Zombie in einen anderen, angrenzenden Chunk und tötest ihn dort, wird auch dieser Todesort-Chunk mitgesäubert. 
-    *   *Standard:* Diese Funktion ist standardmäßig aktiviert (`TaktischerKillAktiv = true`). 
-    *   *Steuerung:* Du kannst den Taktik-Clear über die Konsole mit `es tactical <on/off>` jederzeit umschalten.
-3.  **Durchlaufen (Lokaler Chunk Clear)**
-    Du musst nicht jeden Chunk freikämpfen. Wenn du dich einfach nur 4 Sekunden lang ununterbrochen in einem Chunk aufhältst, gilt dieser ebenfalls als gesichert.
-    *   *Standard:* Diese Funktion ist standardmäßig eingeschaltet (`LokalerChunkClearAktiv = true`).
-    *   *Steuerung:* Möchtest du das Spiel härter machen, deaktiviere diese Mechanik über die Konsole mit `es localclear <on/off>`.
-
----
-
-## Wichtige Hinweise zum Gameplay
-*   **Heat-Spawns:** Heat-Spawns (wie z. B. Screamer) müssen zwingend deaktiviert sein, weil sie die Spawnlogik der Mod umgehen.
-*   **Quests:** Einmal geclearte POIs sind nicht mehr als Quest verfügbar. Bei Grabequests spawnen keine Gegnerwellen mehr.
-*   **Blutmond:** Ein Blutmond ergibt spieltechnisch keinen Sinn und sollte deaktiviert sein, weil er den Grundsatzgedanken der Mod aushebelt.
-*   **Buff für neue Spieler:** Die Mod berücksichtigt euren Buff und verschont euch anfangs etwas.
+1.  **Point of Origin (The Default Clear)**
+    If you kill a zombie spawned by the mod, the chunk from which this zombie originally spawned is immediately cleared.
+2.  **Place of Death (Tactical Kill / Kiting)**
+    In addition to the point of origin, the mod rewards you for playing tactically. If you kite a zombie into another adjacent chunk and kill it there, this death-location chunk is also cleared. 
+    *   *Default:* This feature is enabled by default (`TaktischerKillAktiv = true`). 
+    *   *Control:* You can toggle the tactical clear at any time via the console using `es tactical <on/off>`.
+3.  **Passing Through (Local Chunk Clear)**
+    You don't have to fight for every chunk. If you stay continuously in a chunk for just 4 seconds, it is also considered secured.
+    *   *Default:* This feature is enabled by default (`LokalerChunkClearAktiv = true`).
+    *   *Control:* If you want to make the game harder, disable this mechanic via the console using `es localclear <on/off>`.
 
 ---
 
-## Sandbox-Einstellungen (`Sandboxeinstellungen.txt`)
-Für die Weltgenerierung und die korrekte Funktion der Mod müssen die Sandbox-Einstellungen zwingend vom User korrekt gesetzt werden. Trage die Werte entsprechend in die Vorgaben ein.
-
-*   **Empfohlene Einstellungen:** `ABBDBGFBHABLABWACHAEXGFCCFFAFKAEPAETK`
-*   **Minimaleinstellungen:** `ABWACHA` (Diese Einstellungen stellen das absolute Minimum für ein funktionierendes Spielerlebnis dar).
+## Important Gameplay Notes
+*   **Heat Spawns:** Heat spawns (such as Screamers) must strictly be disabled, as they bypass the mod's spawn logic.
+*   **Quests:** Once cleared, POIs are no longer available as quests. During buried supplies quests, enemy waves will no longer spawn.
+*   **Blood Moon:** A Blood Moon makes no sense from a gameplay perspective and should be disabled because it undermines the core concept of the mod.
+*   **New Player Buff:** The mod takes your starting buff into account and spares you a bit in the beginning.
 
 ---
 
-## Konsolenbefehle
-Die Mod bringt eine Reihe eigener Befehle für die Ingame-Konsole mit. Alle Befehle beginnen mit dem Präfix `es`.
+## Sandbox Settings (`Sandboxeinstellungen.txt`)
+For world generation and the mod to function correctly, the sandbox settings must absolutely be set correctly by the user. Apply the values according to the guidelines.
 
-### User-Befehle
-*   `es map <on/off/reload>`: Nutze diesen Befehl für das Overlay.
-*   `es range [x]`: Um dir anzeigen zu lassen, wie viele Chunks in deiner Umgebung noch spawnen dürfen.
-*   `es msg <on/off>`: Aktiviert oder deaktiviert die globalen Chat-Nachrichten (standardmäßig aktiviert)[cite: 6].
-*   `es where`: Um den nähesten aktiven Zombie zu finden.
-*   `es localclear reason`: Um herauszufinden, warum der Chunk nicht gesäubert ist.
-*   `es cheat_lootbagmarker <on/off>`: Um Radar-Marker auf LootBags setzen zu lassen.
+*   **Recommended Settings:** `ABBDBGFBHABLABWACHAEXGFCCFFAFKAEPAETK`
+*   **Minimum Settings:** `ABWACHA` (These settings represent the absolute minimum for a functional gameplay experience).
 
-### Admin-Befehle
-*   `es limit <Zahl>`: Um das maximale Autospawn-Limit zu setzen.
-*   `es timer <Sekunden>`: Um das Autospawn-Intervall zu ändern.
-*   `es localclear <on/off>`: Schaltet den automatischen 4s-Clear beim Durchlaufen um.
-*   `es tactical <on/off>`: Aktiviert oder deaktiviert den Bonus-Clear (Todesort).
-*   `es cheat_clear [x]`: Um Chunks im Umkreis auf "gecleart" zu setzen.
+---
+
+## Console Commands
+The mod comes with several custom commands for the in-game console. All commands start with the prefix `es`.
+
+### User Commands
+*   `es map <on/off/reload>`: Use this command for the overlay.
+*   `es range [x]`: Shows how many chunks in your vicinity are still allowed to spawn zombies.
+*   `es msg <on/off>`: Enables or disables global chat messages (enabled by default).
+*   `es where`: Finds the nearest active zombie.
+*   `es localclear reason`: Explains why the current chunk hasn't been cleared.
+*   `es cheat_lootbagmarker <on/off>`: Places radar markers on LootBags.
+
+### Admin Commands
+*   `es limit <number>`: Sets the maximum AutoSpawn limit.
+*   `es timer <seconds>`: Changes the AutoSpawn interval.
+*   `es localclear <on/off>`: Toggles the automatic 4-second clear when passing through.
+*   `es tactical <on/off>`: Enables or disables the bonus clear (Place of Death).
+*   `es cheat_clear [x]`: Sets chunks within a radius to "cleared".
