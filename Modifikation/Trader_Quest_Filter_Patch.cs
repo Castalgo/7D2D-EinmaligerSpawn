@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace EinmaligerSpawn.Patches
+namespace EinmaligerSpawn.Trader
 {
     // Wir hängen uns in den QuestEventManager, wo der Händler seine Quest-Gebäude auswählt
     [HarmonyPatch(typeof(QuestEventManager))]
@@ -41,7 +41,7 @@ namespace EinmaligerSpawn.Patches
                 }
                 else
                 {
-                    Debug.Log($"[EinmaligerSpawn] Händler-Filter: Das Gebäude '{haus.name}' wurde bereits ausgerottet und wird nicht mehr als Quest angeboten.");
+                    Log.Out($"[EinmaligerSpawn] Händler-Filter: Das Gebäude '{haus.name}' wurde bereits ausgerottet und wird nicht mehr als Quest angeboten.");
                 }
             }
 

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using EinmaligerSpawn.Config;
 
 namespace EinmaligerSpawn.LootBagMarker
 {
@@ -19,18 +20,18 @@ namespace EinmaligerSpawn.LootBagMarker
 
             IstAktiv = aktiv;
 
-            // NEU: Status in der lokalen Config speichern
-            Manager.ModEinstellungen.LootbagMarkerAktiv = IstAktiv;
-            Manager.ModEinstellungen.Speichern();
+            // Status in der lokalen Config speichern
+            ModEinstellungen.LootbagMarkerAktiv = IstAktiv;
+            ModEinstellungen.Speichern();
 
             if (IstAktiv)
             {
-                Debug.Log("[EinmaligerSpawn] Lootbag-Marker AKTIVIERT.");
+                Log.Out("[EinmaligerSpawn] Lootbag-Marker AKTIVIERT.");
                 checkTimer = CHECK_INTERVALL;
             }
             else
             {
-                Debug.Log("[EinmaligerSpawn] Lootbag-Marker DEAKTIVIERT. Lösche Marker...");
+                Log.Out("[EinmaligerSpawn] Lootbag-Marker DEAKTIVIERT. Lösche Marker...");
                 EntferneAlleMarker();
             }
         }
@@ -38,10 +39,10 @@ namespace EinmaligerSpawn.LootBagMarker
         // Wird vom Lade-Patch aufgerufen
         public static void Wiederherstellen()
         {
-            IstAktiv = Manager.ModEinstellungen.LootbagMarkerAktiv;
+            IstAktiv = ModEinstellungen.LootbagMarkerAktiv;
             if (IstAktiv)
             {
-                Debug.Log("[EinmaligerSpawn] Lootbag-Marker aus lokaler Config wiederhergestellt (AKTIV).");
+                Log.Out("[EinmaligerSpawn] Lootbag-Marker aus lokaler Config wiederhergestellt (AKTIV).");
                 checkTimer = CHECK_INTERVALL; // Zwingt das Radar zum sofortigen Scan
             }
         }

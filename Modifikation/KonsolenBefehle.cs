@@ -1,7 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using EinmaligerSpawn.Manager;
+using EinmaligerSpawn.ChunkDatenbank;
 using UnityEngine;
+using EinmaligerSpawn.Config;
+using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.LocalClear;
+using EinmaligerSpawn.LootBagMarker;
+using EinmaligerSpawn.ZombieSpawner;
 
 namespace EinmaligerSpawn.Commands
 {
@@ -12,17 +17,18 @@ namespace EinmaligerSpawn.Commands
         // -----------------------------------------------------------------
         private const string HilfeText =
     "=== User Befehle ===\n" +
-    "Nutze 'es map <on/off/reload>' für das Overlay,\n" +
-    "Nutze 'es range [x]' um dir anzeigen zu lassen, wie viele Chunks in deiner Umgebung noch spawnen dürfen,\n" +
-    "Nutze 'es msg <on/off>' für globale Chat-Nachrichten,\n" +
-    "Nutze 'es where' um den nähesten aktiven Zombie zu finden,\n" +
+    "Nutze 'es map <on/off/reload>' für das Overlay.\n" +
+    "Nutze 'es range [x]' um dir anzeigen zu lassen, wie viele Chunks in deiner Umgebung noch spawnen dürfen.\n" +
+    "Nutze 'es msg <on/off>' für globale Chat-Nachrichten.\n" +
+    "Nutze 'es where' um den nähesten aktiven Zombie zu finden.\n" +
+    "Nutze 'es localclear reason' um herauszufinden, warum der Chunk nicht gesäubert ist.\n" +
     "Nutze 'es cheat_lootbagmarker <on/off>' um Radar-Marker auf LootBags setzen zu lassen." +
     "=== Einmaliger Spawn Admin-Befehle ===\n" +
-    "Nutze 'es localclear <on/off>' für den autom. 4s-Clear beim Durchlaufen,\n" +
-    "Nutze 'es tactical <on/off>' für den Bonus-Clear,\n" +
-    "Nutze 'es limit <Zahl>' um das max. Autospawn-Limit zu setzen,\n" +
-    "Nutze 'es timer <Sekunden>' um das Autospawn-Intervall zu ändern,\n" +
-    "Nutze 'es cheat_spawn [x]' oder 'es cheat_clear [x]' zum spawnen von Zombies oder Chunks im Umkreis auf gecleart zu setzen.";
+    "Nutze 'es limit <Zahl>' um das max. Autospawn-Limit zu setzen.\n" +
+    "Nutze 'es timer <Sekunden>' um das Autospawn-Intervall zu ändern.\n" +
+    "Nutze 'es localclear <on/off>' für den autom. 4s-Clear beim Durchlaufen.\n" +
+    "Nutze 'es tactical <on/off>' für den Bonus-Clear.\n" +
+    "Nutze 'es cheat_clear [x]' um Chunks im Umkreis auf gecleart zu setzen.";
 
         public override string[] getCommands()
         {
@@ -55,9 +61,6 @@ namespace EinmaligerSpawn.Commands
                     break;
                 case "cheat_lootbagmarker":
                     CmdCheatLootbagMarker(_params);
-                    break;
-                case "cheat_spawn":
-                    CmdCheatSpawn(player, _params, _senderInfo);
                     break;
                 case "limit":
                     CmdLimit(_params);
@@ -95,7 +98,7 @@ namespace EinmaligerSpawn.Commands
 
         private void PrintHelp()
         {
-            UnityEngine.Debug.Log(HilfeText);
+            Log.Out(HilfeText);
         }
 
         // =================================================================
@@ -147,19 +150,19 @@ namespace EinmaligerSpawn.Commands
                         totalChecked++;
                         string chunkId = $"{cx}_{cz}";
 
-                        if (!ChunkDatenbank.ToteZombiesProChunk.ContainsKey(chunkId))
+                        if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
                         {
-                            ChunkDatenbank.ToteZombiesProChunk[chunkId] = 0;
+                            KillCounter.ToteZombiesProChunk[chunkId] = 0;
                             newlyCleared++;
                         }
 
-                        ChunkDatenbank.ToteZombiesProChunk[chunkId]++;
+                        KillCounter.ToteZombiesProChunk[chunkId]++;
                     }
                 }
             }
 
-            UnityEngine.Debug.Log($"=== Cheat Clear ({radiusMeter}m) ===");
-            UnityEngine.Debug.LogWarning($"[ES Spawner] Ich habe {totalChecked} Chunks geprüft und {newlyCleared} neu ausgerottet.");
+            Log.Out($"=== Cheat Clear ({radiusMeter}m) ===");
+            Log.Warning($"[ES Spawner] Ich habe {totalChecked} Chunks geprüft und {newlyCleared} neu ausgerottet.");
         }
 
         // -----------------------------------------------------------------
@@ -173,7 +176,7 @@ namespace EinmaligerSpawn.Commands
 
             if (_params.Count < 2)
             {
-                UnityEngine.Debug.LogWarning($"Aktueller Status (Lootbag-Marker): {currentStatus}. Bitte nutze 'es cheat_lootbagmarker on' oder 'es cheat_lootbagmarker off'.");
+                Log.Warning($"Aktueller Status (Lootbag-Marker): {currentStatus}. Bitte nutze 'es cheat_lootbagmarker on' oder 'es cheat_lootbagmarker off'.");
                 return;
             }
 
@@ -189,30 +192,8 @@ namespace EinmaligerSpawn.Commands
             }
             else
             {
-                UnityEngine.Debug.LogWarning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es cheat_lootbagmarker on' oder 'es cheat_lootbagmarker off'.");
+                Log.Warning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es cheat_lootbagmarker on' oder 'es cheat_lootbagmarker off'.");
             }
-        }
-        // -----------------------------------------------------------------
-        // BEFEHL: es cheat_spawn
-        // -----------------------------------------------------------------
-        private void CmdCheatSpawn(EntityPlayerLocal player, List<string> _params, CommandSenderInfo _senderInfo)
-        {
-            if (_senderInfo.RemoteClientInfo != null)
-            {
-                UnityEngine.Debug.LogWarning("[EinmaligerSpawn] ES Spawner kann nur vom Host/Lokal ausgeführt werden.");
-                return;
-            }
-
-            int requestedZombies = 1;
-            if (_params.Count > 1)
-            {
-                if (int.TryParse(_params[1], out int parsedCount))
-                {
-                    requestedZombies = Mathf.Clamp(parsedCount, 1, 16);
-                }
-            }
-
-            AutoSpawner.FuehreSpawnAus(player, requestedZombies, true);
         }
 
         // -----------------------------------------------------------------
@@ -222,18 +203,18 @@ namespace EinmaligerSpawn.Commands
         {
             if (_params.Count < 2 || !int.TryParse(_params[1], out int neuesLimit))
             {
-                UnityEngine.Debug.LogWarning($"Aktuelles Limit: {ModEinstellungen.GlobalesZombieLimit}. Bitte nutze 'es limit <Zahl>', z.B. 'es limit 18'.");
+                Log.Warning($"Aktuelles Limit: {ModEinstellungen.GlobalesZombieLimit}. Bitte nutze 'es limit <Zahl>', z.B. 'es limit 18'.");
                 return;
             }
 
             neuesLimit = Mathf.Max(1, neuesLimit);
             ModEinstellungen.GlobalesZombieLimit = neuesLimit;
             ModEinstellungen.Speichern();
-            UnityEngine.Debug.LogWarning($"[EinmaligerSpawn] Globales Autospawn-Limit wurde auf {neuesLimit} gesetzt.");
+            Log.Warning($"[EinmaligerSpawn] Globales Autospawn-Limit wurde auf {neuesLimit} gesetzt.");
         }
 
         // -----------------------------------------------------------------
-        // BEFEHL: es localclear / es walkclear <on / off>
+        // BEFEHL: es localclear / es walkclear <on / off / reason>
         // -----------------------------------------------------------------
         private void CmdLocalClear(List<string> _params)
         {
@@ -241,27 +222,39 @@ namespace EinmaligerSpawn.Commands
 
             if (_params.Count < 2)
             {
-                UnityEngine.Debug.LogWarning($"Aktueller Status (localclear): {currentStatus}. Bitte nutze 'es localclear on' oder 'es localclear off'.");
+               Log.Warning($"Aktueller Status (localclear): {currentStatus}. Bitte nutze 'es localclear on', 'off' oder 'reason'.");
                 return;
             }
 
             string state = _params[1].ToLower();
 
+            // NEUER PARAMETER: reason / grund
+            if (state == "reason" || state == "grund")
+            {
+                EntityPlayerLocal player = GameManager.Instance.World.GetPrimaryPlayer();
+                if (player != null)
+                {
+                    LokalenChunkSaeubern.Diagnose(player);
+                }
+                return;
+            }
+
+            // Bestehende ON / OFF Logik
             if (state == "on" || state == "true")
             {
                 ModEinstellungen.LokalerChunkClearAktiv = true;
                 ModEinstellungen.Speichern();
-                UnityEngine.Debug.LogWarning("[EinmaligerSpawn] Lokaler Chunk-Clear (4s-Präsenz) ist nun AKTIVIERT.");
+                Log.Warning("[EinmaligerSpawn] Lokaler Chunk-Clear (4s-Präsenz) ist nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 ModEinstellungen.LokalerChunkClearAktiv = false;
                 ModEinstellungen.Speichern();
-                UnityEngine.Debug.LogWarning("[EinmaligerSpawn] Lokaler Chunk-Clear (4s-Präsenz) ist nun DEAKTIVIERT.");
+                Log.Warning("[EinmaligerSpawn] Lokaler Chunk-Clear (4s-Präsenz) ist nun DEAKTIVIERT.");
             }
             else
             {
-                UnityEngine.Debug.LogWarning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es localclear on' oder 'es localclear off'.");
+                Log.Warning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es localclear on', 'off' oder 'reason'.");
             }
         }
 
@@ -272,7 +265,7 @@ namespace EinmaligerSpawn.Commands
         {
             if (_params.Count < 2)
             {
-                UnityEngine.Debug.Log("Bitte nutze 'es map on', 'es map off' oder 'es map reload'.");
+                Log.Out("Bitte nutze 'es map on', 'es map off' oder 'es map reload'.");
                 return;
             }
 
@@ -280,26 +273,26 @@ namespace EinmaligerSpawn.Commands
 
             if (state == "on" || state == "true")
             {
-                KartenOverlayManager.SetzeModus(true);
+                KartenOverlay.SetzeModus(true);
                 GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1,
                     $"[EinmaligerSpawn] Eroberungs-Karte (Overlay) ist nun [00FF00]AKTIVIERT[-].",
                     null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
             }
             else if (state == "off" || state == "false")
             {
-                KartenOverlayManager.SetzeModus(false);
+                KartenOverlay.SetzeModus(false);
                 GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1,
                     $"[EinmaligerSpawn] Eroberungs-Karte (Overlay) ist nun [FF0000]DEAKTIVIERT[-].",
                     null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
             }
             else if (state == "reload")
             {
-                KartenOverlayManager.Reload();
-                UnityEngine.Debug.Log("[EinmaligerSpawn] Karte (Marker) wurde erfolgreich neu geladen.");
+                KartenOverlay.Reload();
+                Log.Out("[EinmaligerSpawn] Karte (Marker) wurde erfolgreich neu geladen.");
             }
             else
             {
-                UnityEngine.Debug.Log("Ungültiger Parameter. Bitte nutze 'es map on', 'es map off' oder 'es map reload'.");
+                Log.Out("Ungültiger Parameter. Bitte nutze 'es map on', 'es map off' oder 'es map reload'.");
             }
         }
 
@@ -312,7 +305,7 @@ namespace EinmaligerSpawn.Commands
 
             if (_params.Count < 2)
             {
-                UnityEngine.Debug.LogWarning($"Aktueller Status (msg): {currentStatus}. Bitte nutze 'es msg on' oder 'es msg off'.");
+                Log.Warning($"Aktueller Status (msg): {currentStatus}. Bitte nutze 'es msg on' oder 'es msg off'.");
                 return;
             }
 
@@ -322,17 +315,17 @@ namespace EinmaligerSpawn.Commands
             {
                 ModEinstellungen.ChatNachrichtenAktiv = true;
                 ModEinstellungen.Speichern();
-                UnityEngine.Debug.Log("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun AKTIVIERT.");
+                Log.Out("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 ModEinstellungen.ChatNachrichtenAktiv = false;
                 ModEinstellungen.Speichern();
-                UnityEngine.Debug.Log("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun DEAKTIVIERT.");
+                Log.Out("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun DEAKTIVIERT.");
             }
             else
             {
-                UnityEngine.Debug.LogWarning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es msg on' oder 'es msg off'.");
+                Log.Warning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es msg on' oder 'es msg off'.");
             }
         }
 
@@ -341,7 +334,7 @@ namespace EinmaligerSpawn.Commands
         // -----------------------------------------------------------------
         private void CmdRange(EntityPlayerLocal player, List<string> _params)
         {
-            int radiusMeter = 80;
+            int radiusMeter = 120;
 
             if (_params.Count > 1)
             {
@@ -378,8 +371,8 @@ namespace EinmaligerSpawn.Commands
                         y_Gesamt++;
                         string chunkId = $"{cx}_{cz}";
 
-                        if (ChunkDatenbank.ToteZombiesProChunk.ContainsKey(chunkId) &&
-                            ChunkDatenbank.ToteZombiesProChunk[chunkId] >= 1)
+                        if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) &&
+                            KillCounter.ToteZombiesProChunk[chunkId] >= 1)
                         {
                             x_Gesperrt++;
                         }
@@ -390,8 +383,8 @@ namespace EinmaligerSpawn.Commands
             float prozentFloat = y_Gesamt > 0 ? ((float)x_Gesperrt / y_Gesamt) * 100f : 0f;
             int prozent = Mathf.RoundToInt(prozentFloat);
 
-            UnityEngine.Debug.Log($"=== Spawn-Radar ({radiusMeter}m) ===");
-            UnityEngine.Debug.Log($"Status: {x_Gesperrt}/{y_Gesamt} ({prozent}%)");
+            Log.Out($"=== Spawn-Radar ({radiusMeter}m) ===");
+            Log.Out($"Status: {x_Gesperrt}/{y_Gesamt} ({prozent}%)");
         }
 
         // -----------------------------------------------------------------
@@ -403,7 +396,7 @@ namespace EinmaligerSpawn.Commands
 
             if (_params.Count < 2)
             {
-                UnityEngine.Debug.LogWarning($"Aktueller Status (tactical): {currentStatus}. Bitte nutze 'es tactical on' oder 'es tactical off'.");
+                Log.Warning($"Aktueller Status (tactical): {currentStatus}. Bitte nutze 'es tactical on' oder 'es tactical off'.");
                 return;
             }
 
@@ -413,17 +406,17 @@ namespace EinmaligerSpawn.Commands
             {
                 ModEinstellungen.TaktischerKillAktiv = true;
                 ModEinstellungen.Speichern();
-                UnityEngine.Debug.LogWarning("[EinmaligerSpawn] Taktischer Kill (Bonus-Clear) ist nun AKTIVIERT.");
+                Log.Warning("[EinmaligerSpawn] Taktischer Kill (Bonus-Clear) ist nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 ModEinstellungen.TaktischerKillAktiv = false;
                 ModEinstellungen.Speichern();
-                UnityEngine.Debug.LogWarning("[EinmaligerSpawn] Taktischer Kill (Bonus-Clear) ist nun DEAKTIVIERT.");
+                Log.Warning("[EinmaligerSpawn] Taktischer Kill (Bonus-Clear) ist nun DEAKTIVIERT.");
             }
             else
             {
-                UnityEngine.Debug.LogWarning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es tactical on' oder 'es tactical off'.");
+                Log.Warning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es tactical on' oder 'es tactical off'.");
             }
         }
 
@@ -434,14 +427,14 @@ namespace EinmaligerSpawn.Commands
         {
             if (_params.Count < 2 || !float.TryParse(_params[1], out float neuerTimer))
             {
-                UnityEngine.Debug.LogWarning($"Aktueller Timer: {ModEinstellungen.SpawnCheckIntervall} Sekunden. Bitte nutze 'es timer <Sekunden>', z.B. 'es timer 15'.");
+                Log.Warning($"Aktueller Timer: {ModEinstellungen.SpawnCheckIntervall} Sekunden. Bitte nutze 'es timer <Sekunden>', z.B. 'es timer 15'.");
                 return;
             }
 
             neuerTimer = Mathf.Max(1f, neuerTimer);
             ModEinstellungen.SpawnCheckIntervall = neuerTimer;
             ModEinstellungen.Speichern();
-            UnityEngine.Debug.LogWarning($"[EinmaligerSpawn] Autospawn-Überprüfungsintervall wurde auf {neuerTimer} Sekunden gesetzt.");
+            Log.Warning($"[EinmaligerSpawn] Autospawn-Überprüfungsintervall wurde auf {neuerTimer} Sekunden gesetzt.");
         }
 
         // -----------------------------------------------------------------
@@ -482,12 +475,12 @@ namespace EinmaligerSpawn.Commands
 
                 NavObjectManager.Instance.RegisterNavObject(magicClassName, closestEnemy.transform, "ui_game_symbol_enemy_dot", false);
 
-                UnityEngine.Debug.Log($"[ES Spawner] Universal-Radar: Nächster Feind (Typ: {closestEnemy.GetType().Name}, ID: {closestEnemy.entityId}) ist {Mathf.RoundToInt(closestDist)}m entfernt.");
-                UnityEngine.Debug.Log($"[ES Spawner] Marker erfolgreich über Systemklasse '{magicClassName}' gesetzt!");
+                Log.Out($"[ES Spawner] Universal-Radar: Nächster Feind (Typ: {closestEnemy.GetType().Name}, ID: {closestEnemy.entityId}) ist {Mathf.RoundToInt(closestDist)}m entfernt.");
+                Log.Out($"[ES Spawner] Marker erfolgreich über Systemklasse '{magicClassName}' gesetzt!");
             }
             else
             {
-                UnityEngine.Debug.Log("[ES Spawner] Universal-Radar: Keine lebenden Feinde in deinem geladenen Umfeld gefunden.");
+                Log.Out("[ES Spawner] Universal-Radar: Keine lebenden Feinde in deinem geladenen Umfeld gefunden.");
             }
         }
     }

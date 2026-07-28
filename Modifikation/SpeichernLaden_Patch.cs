@@ -1,8 +1,12 @@
-﻿using HarmonyLib;
-using EinmaligerSpawn.Manager;
+﻿using EinmaligerSpawn.ChunkDatenbank;
+using EinmaligerSpawn.Config; 
+using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.LocalClear;
 using EinmaligerSpawn.LootBagMarker;
+using EinmaligerSpawn.ZombieSpawner;
+using HarmonyLib;
 
-namespace EinmaligerSpawn.Patches
+namespace EinmaligerSpawn.SaveLoadPatches
 {
     // Patch für das Speichern
     [HarmonyPatch(typeof(GameManager), "SaveWorld")]
@@ -14,7 +18,7 @@ namespace EinmaligerSpawn.Patches
             string savePath = GameIO.GetSaveGameDir();
             if (!string.IsNullOrEmpty(savePath))
             {
-                ChunkDatenbank.Save(savePath);
+                KillCounter.Save(savePath);
 
                 // Einstellungen für dieses Savegame speichern
                 ModEinstellungen.Speichern();
@@ -32,7 +36,7 @@ namespace EinmaligerSpawn.Patches
             string savePath = GameIO.GetSaveGameDir();
             if (!string.IsNullOrEmpty(savePath))
             {
-                ChunkDatenbank.Load(savePath);
+                KillCounter.Load(savePath);
 
                 // Einstellungen für diese Welt laden
                 ModEinstellungen.Laden(savePath);                
@@ -59,7 +63,7 @@ namespace EinmaligerSpawn.Patches
                 DynamischesSpawnLimit.InitialisiereWerte();
 
                 // Karte basierend auf den gerade geladenen Einstellungen aktualisieren
-                KartenOverlayManager.Wiederherstellen();
+                KartenOverlay.Wiederherstellen();
 
                 // LootbagMarker basierend auf den Einstellungen wiederherstellen
                 LootbagMarkerManager.Wiederherstellen();
@@ -74,13 +78,13 @@ namespace EinmaligerSpawn.Patches
         [HarmonyPostfix]
         public static void Postfix()
         {
-            UnityEngine.Debug.Log("[EinmaligerSpawn] Spiel wird verlassen. Leere den Arbeitsspeicher...");
+            Log.Out("[EinmaligerSpawn] Spiel wird verlassen. Leere den Arbeitsspeicher...");
 
             // 1. Update-Schleife für die nächste Sitzung wieder freigeben
             DynamischesSpawnLimit.IstInitialisiert = false;
 
-            // 2. Statisches Gedächtnis des Karten-Overlays löschen
-            KartenOverlayManager.LoescheAlleMarker();
+            //// 2. Autospawner zurücksetzen (damit die Spieler-Tracking-Daten gelöscht werden)
+            AutoSpawner.Reset();
 
             // 3. Spieler-Tracking (4-Sekunden-Clear) zurücksetzen
             LokalenChunkSaeubern.Reset();
@@ -89,12 +93,12 @@ namespace EinmaligerSpawn.Patches
             LootbagMarkerManager.EntferneAlleMarker();
 
             // 5. Temporäres Zombie-Gedächtnis leeren (sicherheitshalber)
-            if (ChunkDatenbank.ZombieUrsprung != null)
+            if (KillCounter.ZombieUrsprung != null)
             {
-                ChunkDatenbank.ZombieUrsprung.Clear();
+                KillCounter.ZombieUrsprung.Clear();
             }
-            if (ChunkDatenbank.ToteZombiesProChunk != null)
-                ChunkDatenbank.ToteZombiesProChunk.Clear();
+            if (KillCounter.ToteZombiesProChunk != null)
+                KillCounter.ToteZombiesProChunk.Clear();
         }
     }
 

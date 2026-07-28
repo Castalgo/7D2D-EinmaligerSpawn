@@ -4,10 +4,12 @@ using System.IO;
 using Newtonsoft.Json;
 using UnityEngine;
 using System.Linq;
+using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.Config;
 
-namespace EinmaligerSpawn.Manager
+namespace EinmaligerSpawn.ChunkDatenbank
 {
-    public static class ChunkDatenbank
+    public static class KillCounter
     {
         // Speichert die Anzahl der GETÖTETEN Zombies pro Chunk
         public static Dictionary<string, int> ToteZombiesProChunk = new Dictionary<string, int>();
@@ -35,7 +37,7 @@ namespace EinmaligerSpawn.Manager
 
             if (ToteZombiesProChunk[chunkId] == abriegelungsLimit)
             {
-                Debug.LogWarning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
+                Log.Warning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
 
                 // Holt die aktuelle In-Game-Zeit (z.B. Tag 4, 14:35)
                 ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
@@ -43,9 +45,9 @@ namespace EinmaligerSpawn.Manager
                 string feedbackMsg = $"[00FF00][{timeString}] Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet.[-]";
                 GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
 
-                if (KartenOverlayManager.IstAktiv)
+                if (KartenOverlay.IstAktiv)
                 {
-                    KartenOverlayManager.ZeichneMarker(chunkId);
+                    KartenOverlay.ErzwingeRedraw();
                 }
 
             }
@@ -65,9 +67,9 @@ namespace EinmaligerSpawn.Manager
             ToteZombiesProChunk[chunkId] = 1;
 
             // NEU: Live-Update für die Karte auslösen
-            if (KartenOverlayManager.IstAktiv)
+            if (KartenOverlay.IstAktiv)
             {
-                KartenOverlayManager.ZeichneMarker(chunkId);
+                KartenOverlay.ErzwingeRedraw();
             }
 
             // Chatnachricht und Konsole vorbereiten
@@ -77,12 +79,12 @@ namespace EinmaligerSpawn.Manager
 
             if (istNachbar)
             {
-                Debug.LogWarning($"[EinmaligerSpawn] Taktischer Bonus: Nachbar {chunkId} zusätzlich gesichert!");
+                Log.Warning($"[EinmaligerSpawn] Taktischer Bonus: Nachbar {chunkId} zusätzlich gesichert!");
                 feedbackMsg = $"[00FF00][{timeString}] Flächensäuberungsbonus: Angrenzendes Gebiet {chunkId} clear.[-]";
             }
             else
             {
-                Debug.LogWarning($"[EinmaligerSpawn] Taktischer Clear! Todes-Chunk {chunkId} wurde gesichert.");
+                Log.Warning($"[EinmaligerSpawn] Taktischer Clear! Todes-Chunk {chunkId} wurde gesichert.");
                 feedbackMsg = $"[00FF00][{timeString}] Taktische Säuberung: Gebiet {chunkId} clear.[-]";
             }
 
@@ -114,11 +116,11 @@ namespace EinmaligerSpawn.Manager
                     // Lese die JSON-Datei aus und befülle das Dictionary
                     string json = File.ReadAllText(path);
                     ToteZombiesProChunk = JsonConvert.DeserializeObject<Dictionary<string, int>>(json) ?? new Dictionary<string, int>();
-                    Debug.Log($"[EinmaligerSpawn] {ToteZombiesProChunk.Count} Chunk-Daten erfolgreich geladen.");
+                    Log.Out($"[EinmaligerSpawn] {ToteZombiesProChunk.Count} Chunk-Daten erfolgreich geladen.");
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[EinmaligerSpawn] Fehler beim Laden der Chunks: {e.Message}");
+                    Log.Error($"[EinmaligerSpawn] Fehler beim Laden der Chunks: {e.Message}");
                 }
             }
             else
@@ -143,7 +145,7 @@ namespace EinmaligerSpawn.Manager
             }
             catch (Exception e)
             {
-                Debug.LogError($"[EinmaligerSpawn] Fehler beim Speichern der Chunks: {e.Message}");
+                Log.Error($"[EinmaligerSpawn] Fehler beim Speichern der Chunks: {e.Message}");
             }
         }
     }

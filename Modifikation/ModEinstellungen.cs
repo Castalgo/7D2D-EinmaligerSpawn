@@ -3,7 +3,7 @@ using System.IO;
 using Newtonsoft.Json;
 using UnityEngine;
 
-namespace EinmaligerSpawn.Manager
+namespace EinmaligerSpawn.Config
 {
     public static class ModEinstellungen
     {
@@ -12,7 +12,7 @@ namespace EinmaligerSpawn.Manager
         public static bool KartenOverlayAktiv = false; 
         public static bool LokalerChunkClearAktiv = true;
         public static bool LootbagMarkerAktiv = false;
-        public static float SpawnCheckIntervall = 15f;
+        public static float SpawnCheckIntervall = 5f;
         public static bool TaktischerKillAktiv = true;
 
         public static void Laden(string saveDir)
@@ -37,7 +37,7 @@ namespace EinmaligerSpawn.Manager
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[EinmaligerSpawn] Fehler beim Laden der lokalen Config: {e.Message}");
+                    Log.Error($"[EinmaligerSpawn] Fehler beim Laden der lokalen Config: {e.Message}");
                 }
             }
             else
@@ -76,7 +76,7 @@ namespace EinmaligerSpawn.Manager
             }
             catch (Exception e)
             {
-                Debug.LogError($"[EinmaligerSpawn] Fehler beim Speichern der lokalen Config: {e.Message}");
+                Log.Error($"[EinmaligerSpawn] Fehler beim Speichern der lokalen Config: {e.Message}");
             }
         }
 

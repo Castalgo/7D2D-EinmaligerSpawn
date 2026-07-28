@@ -61,7 +61,7 @@ namespace EinmaligerSpawn
                     {
                         // Multiplikator anwenden!
                         MaxKills = hoechsterVanillaWert * 2;
-                        Debug.Log($"[EinmaligerSpawn] Höchster Vanilla-Feind-Wert: {hoechsterVanillaWert}. Neues globales Limit: {MaxKills}");
+                        Log.Out($"[EinmaligerSpawn] Höchster Vanilla-Feind-Wert: {hoechsterVanillaWert}. Neues globales Limit: {MaxKills}");
 
                         // TEIL 2: Alle Vanilla-Spawns im RAM mit dem neuen Limit überschreiben
                         foreach (DictionaryEntry entry in dict)
@@ -87,13 +87,13 @@ namespace EinmaligerSpawn
                                 }
                             }
                         }
-                        Debug.Log($"[EinmaligerSpawn] Engine erfolgreich gehackt: Alle Feind-Spawns auf {MaxKills} gesetzt!");
+                        Log.Out($"[EinmaligerSpawn] Engine erfolgreich gehackt: Alle Feind-Spawns auf {MaxKills} gesetzt!");
                     }
                 }
             }
             catch (Exception e)
             {
-                Debug.Log($"[EinmaligerSpawn] Fehler beim dynamischen Patchen: {e.Message}");
+                Log.Out($"[EinmaligerSpawn] Fehler beim dynamischen Patchen: {e.Message}");
             }
         }
     }

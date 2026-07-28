@@ -22,5 +22,4 @@ Ziele der Mod zzz_EinmaligerSpawn (Version 3.x.x)
   
 ToDo für Programmierung
 ----------------------------------------------------------------
-- "es map": Symbole sparen durch Verschmelzung
 - "es easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen

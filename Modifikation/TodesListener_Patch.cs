@@ -1,14 +1,15 @@
-﻿using EinmaligerSpawn.Manager;
+﻿using System.Collections.Generic;
+using EinmaligerSpawn.ChunkDatenbank;
+using EinmaligerSpawn.Config;
 using HarmonyLib;
-using System.Collections.Generic;
 using UnityEngine;
 
-namespace EinmaligerSpawn.Patches
+namespace EinmaligerSpawn.SpawnBlocker
 {
     [HarmonyPatch(typeof(EntityAlive), "SetDead")]
     public class TodesListener_Patch
     {
-        // NEU: Wir schalten uns VOR die Engine-Logik
+        //  Wir schalten uns VOR die Engine-Logik
         [HarmonyPrefix]
         public static void Prefix(EntityAlive __instance, out bool __state)
         {
@@ -39,10 +40,10 @@ namespace EinmaligerSpawn.Patches
                 string ursprungsChunk;
 
                 // 2. Woher kommt der Zombie?
-                if (ChunkDatenbank.ZombieUrsprung.TryGetValue(__instance.entityId, out ursprungsChunk))
+                if (KillCounter.ZombieUrsprung.TryGetValue(__instance.entityId, out ursprungsChunk))
                 {
                     // Er stammt aus unserem regulären Biom-Spawn -> Aus dem RAM löschen
-                    ChunkDatenbank.ZombieUrsprung.Remove(__instance.entityId);
+                    KillCounter.ZombieUrsprung.Remove(__instance.entityId);
                 }
                 else
                 {
@@ -52,7 +53,7 @@ namespace EinmaligerSpawn.Patches
                 }
 
                 // 3. REGEL 1: Den regulären Kill IMMER im Ursprungs-Chunk verbuchen
-                ChunkDatenbank.AddToterZombieNachID(ursprungsChunk, 1);
+                KillCounter.AddToterZombieNachID(ursprungsChunk, 1);
 
                 // ---------------------------------------------------------
                 // GLOBALE PRÜFUNG: Ist exakt DIESER Chunk jetzt feindfrei?
@@ -99,7 +100,7 @@ namespace EinmaligerSpawn.Patches
                         string nachbarId = $"{nX}_{nZ}";
 
                         // Hat der Nachbar-Chunk schon eine Historie?
-                        if (ChunkDatenbank.ToteZombiesProChunk.ContainsKey(nachbarId) && ChunkDatenbank.ToteZombiesProChunk[nachbarId] >= 1)
+                        if (KillCounter.ToteZombiesProChunk.ContainsKey(nachbarId) && KillCounter.ToteZombiesProChunk[nachbarId] >= 1)
                         {
                             continue; // nächstes Element von foreach
                         }
@@ -128,7 +129,7 @@ namespace EinmaligerSpawn.Patches
                         if (!hatAktiveFeinde)
                         {
                             // Die Datenbank übernimmt jetzt das Speichern, die Map und den Chat
-                            ChunkDatenbank.VerbucheTaktischenKill(nachbarId, true);
+                            KillCounter.VerbucheTaktischenKill(nachbarId, true);
 
                             return; // Nachbar belohnt -> Fertig!
                         }
@@ -136,7 +137,7 @@ namespace EinmaligerSpawn.Patches
 
                     // FALLBACK SZENARIO A: Kein leerer Nachbar gefunden.
                     // Todes-Chunk bekommt den Bonus-Kill (geht somit z. B. von 0 auf 2)
-                    ChunkDatenbank.ToteZombiesProChunk[todesChunkId]++;
+                    KillCounter.ToteZombiesProChunk[todesChunkId]++;
                 }
                 else
                 {
@@ -144,15 +145,15 @@ namespace EinmaligerSpawn.Patches
                     // SZENARIO B: Gekitet! Zombie stirbt restlos in einem FREMDEN Chunk
                     // -> Der Todes-Chunk bekommt den Bonus-Kill.
                     // ---------------------------------------------------------
-                    if (!ChunkDatenbank.ToteZombiesProChunk.ContainsKey(todesChunkId) || ChunkDatenbank.ToteZombiesProChunk[todesChunkId] < 1)
+                    if (!KillCounter.ToteZombiesProChunk.ContainsKey(todesChunkId) || KillCounter.ToteZombiesProChunk[todesChunkId] < 1)
                     {
                         // Die Datenbank übernimmt das Setzen auf 1, Map-Update und den Chat
-                        ChunkDatenbank.VerbucheTaktischenKill(todesChunkId, false);
+                        KillCounter.VerbucheTaktischenKill(todesChunkId, false);
                     }
                     else
                     {
                         // Chunk war ohnehin schon clear -> Er bekommt einfach den Bonus-Kill addiert
-                        ChunkDatenbank.ToteZombiesProChunk[todesChunkId]++;
+                        KillCounter.ToteZombiesProChunk[todesChunkId]++;
                     }
                 }
             }

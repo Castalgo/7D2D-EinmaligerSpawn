@@ -1,6 +1,6 @@
 ﻿using HarmonyLib;
 
-namespace EinmaligerSpawn.Patches
+namespace EinmaligerSpawn.SpawnBlocker
 {
     [HarmonyPatch(typeof(SleeperVolume))]
     public class POI_Sleeper_Kontrolle

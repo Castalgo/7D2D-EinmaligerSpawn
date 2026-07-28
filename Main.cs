@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using EinmaligerSpawn.LootBagMarker;
-using EinmaligerSpawn.Manager;
+using EinmaligerSpawn.ZombieSpawner;
+using EinmaligerSpawn.LocalClear;
 using HarmonyLib;
 using UnityEngine;
 
@@ -10,12 +11,12 @@ namespace EinmaligerSpawn
     {
         public void InitMod(Mod mod)
         {
-            Debug.Log("[EinmaligerSpawn] Initialisiere Mod-Logik...");
+            Log.Out("[EinmaligerSpawn] Initialisiere Mod-Logik...");
 
             var harmony = new Harmony("com.castalgo.einmaligerspawn");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
 
-            // HIER IST DER FIX: Das Schlüsselwort "ref" wurde zum Parameter hinzugefügt
+            // Patch für alle gemoddeten Änderungen, die auf GameUpdate angewiesen sind
             ModEvents.GameUpdate.RegisterHandler((ref ModEvents.SGameUpdateData data) =>
             {
                 AutoSpawner.OnGameUpdate();
@@ -23,7 +24,7 @@ namespace EinmaligerSpawn
                 LootbagMarkerManager.OnGameUpdate();
             });
 
-            Debug.Log("[EinmaligerSpawn] Alle Patches erfolgreich geladen!");
+            Log.Out("[EinmaligerSpawn] Alle Patches erfolgreich geladen!");
         }
     }
 }
