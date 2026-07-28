@@ -1,25 +1,31 @@
-Ziele der Mod zzz_EinmaligerSpawn (Version 3.x.x)
+Ziele der Mod EinmaligerSpawn (Version 3.x.x)
 ----------------------------------------------------------------
 [GRUNDLAGE / MOD ZIEL]
-- Ziel 5: Gegner spawnen genau einmal und zwar beim erstmaligen Betreten eines Chunks
+- Gegner spawnen genau einmal und zwar beim erstmaligen Betreten eines Chunks
 
 [XML-LOGIK: WELTEINSTELLUNGEN & HÄNDLER]
-- Ziel 3: Kein Spawn von Zombie-Wellen bei verkleinernden Kreisen von Grabequests.
+- Kein Spawn von Zombie-Wellen bei verkleinernden Kreisen von Grabequests.
 
 [C#-LOGIK: GEBÄUDE & POIs]
 - Die festen Sleeper-Spawnpunkte innerhalb eines POIs (Gebäudes) triggern genau einmal beim erstmaligen Betreten.
-- Ziel 6: Nach der Räumung bleiben sie dauerhaft leer (kein natürlicher Respawn).
-- Quest-Ausnahme zu Ziel 6: Der Händler kann geclearte POIs nicht mehr als "Säubern" oder "Abholen"-Questort festlegen.
+- Nach der Räumung bleiben sie dauerhaft leer (kein natürlicher Respawn).
+- Quest-Ausnahme: Der Händler kann geclearte POIs nicht mehr als "Säubern" oder "Abholen"-Questort festlegen.
 
 [C#-LOGIK: WILDNIS & CHUNKS]
-- Ziel 8: In jedem Biom (Wald, Wüste, Schnee etc.) spawnen initial doppelt so viele Zombies wie standardmäßig im Ödland bei Nacht.
-- Die offene Welt ist in Chunks (Planquadrate) unterteilt. Beim erstmaligen Generieren/Betreten eines Chunks wird die Zombiedichte maximal befüllt. 
-- ziel 7: Das Spiel darf für einen bereits generierten Chunk niemals die standardmäßige, zeitbasierte Spawn-Logik für Biom-Zombies erneut aufrufen.
-- Ziel 4: Beim Verlassen eines Chunks werden die dort lebenden Biom-Zombies nicht gelöscht, sondern ihr Vorhandensein wird im Chunk-Datensatz gespeichert.
-  Kehrt der Spieler zurück, werden genau diese verbliebenen Zombies im Chunk reaktiviert (sie dürfen dabei die Position leicht verändert haben).
-  Wird ein Zombie getötet, ist er permanent aus diesem Chunk-Pool entfernt. Die Wildnis ist somit dauerhaft ausrottbar.
+- In jedem Biom (Wald, Wüste, Schnee etc.) spawnen bis zu doppelt so viele Zombies wie standardmäßig im Ödland bei Nacht.
+- Die offene Welt ist in Chunks (Planquadrate) unterteilt. Jeder Chunk darf Zombies spawnen, bis er als gesäubert markiert wurde. 
+- Beim Verlassen eines Chunks werden die dort lebenden Biom-Zombies weiterhin gelöscht, aber der Chunk bleibt unsicher.
+- Die Wildnis ist dauerhaft ausrottbar.
+- Zusätzliche Spawnmechanik, damit der Spawn permanent und nicht wellenartig geschieht
+
+[C#-LOGIK: Hilfsmittel]
+- Bereitstellung einer Karte, wo die Wildnis gesäubert wurde
+- Marker zum finden der gedroppten Lootbags
+- zusätzliche Möglichkeiten Chunks zu säubern: Durchlaufen, Kitten.
+- An- und Abschalten von Hinweistexten der Mod
   
   
-ToDo für Programmierung
+  
+Idee für zukünftige Erweiterung
 ----------------------------------------------------------------
-- "es easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen
+- "easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen

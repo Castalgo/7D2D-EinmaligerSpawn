@@ -55,7 +55,7 @@ Für die Weltgenerierung und die korrekte Funktion der Mod müssen die Sandbox-E
 Die Mod bringt eine Reihe eigener Befehle für die Ingame-Konsole mit. Alle Befehle beginnen mit dem Präfix `es`.
 
 ### User-Befehle
-*   `es map <on/off/reload>`: Nutze diesen Befehl für das Overlay.
+*   `es map <on/off/reload>`: Nutze diesen Befehl für das grüne Karten-Overlay.
 *   `es range [x]`: Um dir anzeigen zu lassen, wie viele Chunks in deiner Umgebung noch spawnen dürfen.
 *   `es msg <on/off>`: Aktiviert oder deaktiviert die globalen Chat-Nachrichten (standardmäßig aktiviert)[cite: 6].
 *   `es where`: Um den nähesten aktiven Zombie zu finden.

@@ -55,7 +55,7 @@ For world generation and the mod to function correctly, the sandbox settings mus
 The mod comes with several custom commands for the in-game console. All commands start with the prefix `es`.
 
 ### User Commands
-*   `es map <on/off/reload>`: Use this command for the overlay.
+*   `es map <on/off/reload>`: Use this command for the green map overlay.
 *   `es range [x]`: Shows how many chunks in your vicinity are still allowed to spawn zombies.
 *   `es msg <on/off>`: Enables or disables global chat messages (enabled by default).
 *   `es where`: Finds the nearest active zombie.
