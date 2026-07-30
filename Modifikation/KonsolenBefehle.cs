@@ -21,6 +21,7 @@ namespace EinmaligerSpawn.Commands
     "Nutze 'es range [x]' um dir anzeigen zu lassen, wie viele Chunks in deiner Umgebung noch spawnen dürfen.\n" +
     "Nutze 'es msg <on/off>' für globale Chat-Nachrichten.\n" +
     "Nutze 'es where' um den nähesten aktiven Zombie zu finden.\n" +
+    "Nutze 'es progressbuff <on/off>' um einen Buff anzeigen zu lassen, der deinen lokalen Säuberungs-Fortschritt anzeigt.\n" +
     "Nutze 'es localclear reason' um herauszufinden, warum der Chunk nicht gesäubert ist.\n" +
     "Nutze 'es cheat_lootbagmarker <on/off>' um Radar-Marker auf LootBags setzen zu lassen." +
     "=== Einmaliger Spawn Admin-Befehle ===\n" +
@@ -28,7 +29,7 @@ namespace EinmaligerSpawn.Commands
     "Nutze 'es timer <Sekunden>' um das Autospawn-Intervall zu ändern.\n" +
     "Nutze 'es localclear <on/off>' für den autom. 4s-Clear beim Durchlaufen.\n" +
     "Nutze 'es tactical <on/off>' für den Bonus-Clear.\n" +
-    "Nutze 'es cheat_clear [x]' um Chunks im Umkreis auf gecleart zu setzen.";
+    "Nutze 'es cheat_clear [radius] [reset]' um Chunks im Umkreis auf gecleart zu setzen oder zu löschen.";
 
         public override string[] getCommands()
         {
@@ -76,6 +77,9 @@ namespace EinmaligerSpawn.Commands
                 case "msg":
                     CmdMsg(_params);
                     break;
+                case "progressbuff":
+                    CmdProgressBuff(player, _params);
+                    break;
                 case "range":
                     CmdRange(player, _params);
                     break;
@@ -106,17 +110,28 @@ namespace EinmaligerSpawn.Commands
         // =================================================================
 
         // -----------------------------------------------------------------
-        // BEFEHL: es cheat_clear
+        // BEFEHL: es cheat_clear [radius] [reset]
         // -----------------------------------------------------------------
         private void CmdCheatClear(EntityPlayerLocal player, List<string> _params)
         {
             int radiusMeter = 20;
+            bool isReset = false;
 
+            // 1. Parameter: Radius (optional)
             if (_params.Count > 1)
             {
                 if (int.TryParse(_params[1], out int parsedRadius))
                 {
                     radiusMeter = Mathf.Clamp(parsedRadius, 1, 256);
+                }
+            }
+
+            // 2. Parameter: Modus (optional, checkt auf "reset")
+            if (_params.Count > 2)
+            {
+                if (_params[2].ToLower() == "reset")
+                {
+                    isReset = true;
                 }
             }
 
@@ -130,7 +145,7 @@ namespace EinmaligerSpawn.Commands
             int chunkSuchRadius = Mathf.CeilToInt((float)radiusMeter / 16f);
             int maxDistSq = radiusMeter * radiusMeter;
 
-            int newlyCleared = 0;
+            int newlyModified = 0;
             int totalChecked = 0;
 
             for (int cx = playerChunkX - chunkSuchRadius; cx <= playerChunkX + chunkSuchRadius; cx++)
@@ -150,19 +165,45 @@ namespace EinmaligerSpawn.Commands
                         totalChecked++;
                         string chunkId = $"{cx}_{cz}";
 
-                        if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                        if (isReset)
                         {
-                            KillCounter.ToteZombiesProChunk[chunkId] = 0;
-                            newlyCleared++;
-                        }
+                            // --- RESET LOGIK ---
+                            // Chunk aus dem KillCounter löschen
+                            if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                            {
+                                KillCounter.ToteZombiesProChunk.Remove(chunkId);
+                                newlyModified++;
+                            }
 
-                        KillCounter.ToteZombiesProChunk[chunkId]++;
+                            // Chunk aus dem AutoSpawner-Cache werfen, damit er neu gescannt werden kann
+                            AutoSpawner.RemoveChunkFromCache(chunkId);
+                        }
+                        else
+                        {
+                            // --- CLEAR LOGIK ---
+                            if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                            {
+                                KillCounter.ToteZombiesProChunk[chunkId] = 0;
+                                newlyModified++;
+                            }
+                            KillCounter.ToteZombiesProChunk[chunkId]++;
+                        }
                     }
                 }
             }
 
-            Log.Out($"=== Cheat Clear ({radiusMeter}m) ===");
-            Log.Warning($"[ES Spawner] Ich habe {totalChecked} Chunks geprüft und {newlyCleared} neu ausgerottet.");
+            // Konsolen-Feedback dynamisch anpassen
+            string actionText = isReset ? "reaktiviert (Reset)" : "neu ausgerottet (Clear)";
+            string modeText = isReset ? "RESET" : "CLEAR";
+
+            Log.Out($"=== Cheat Clear ({radiusMeter}m) - Modus: {modeText} ===");
+            Log.Warning($"[ES Spawner] Ich habe {totalChecked} Chunks geprüft und {newlyModified} {actionText}.");
+
+            // Erzwingt ein Neuzeichnen der Overlay-Karte, falls sie aktiv ist
+            if (ModEinstellungen.KartenOverlayAktiv)
+            {
+                KartenOverlay.ErzwingeRedraw();
+            }
         }
 
         // -----------------------------------------------------------------
@@ -330,6 +371,51 @@ namespace EinmaligerSpawn.Commands
         }
 
         // -----------------------------------------------------------------
+        // BEFEHL: es progressbuff <on / off>
+        // -----------------------------------------------------------------
+        private void CmdProgressBuff(EntityPlayerLocal player, List<string> _params)
+        {
+            string currentStatus = ModEinstellungen.ZeigeLokalenFortschritt ? "ON" : "OFF";
+
+            if (_params.Count < 2)
+            {
+                Log.Warning($"Aktueller Status (progressbuff): {currentStatus}. Bitte nutze 'es progressbuff on' oder 'es progressbuff off'.");
+                return;
+            }
+
+            string state = _params[1].ToLower();
+
+            if (state == "on" || state == "true")
+            {
+                ModEinstellungen.ZeigeLokalenFortschritt = true;
+                ModEinstellungen.Speichern();
+                Log.Out("[EinmaligerSpawn] Lokaler Fortschritts-Buff ist nun AKTIVIERT.");
+
+                // Sofortiges Feedback im HUD erzwingen
+                if (player != null && !player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
+                {
+                    player.Buffs.AddBuff("buffEinmaligerSpawnProgress");
+                }
+            }
+            else if (state == "off" || state == "false")
+            {
+                ModEinstellungen.ZeigeLokalenFortschritt = false;
+                ModEinstellungen.Speichern();
+                Log.Out("[EinmaligerSpawn] Lokaler Fortschritts-Buff ist nun DEAKTIVIERT.");
+
+                // Sofortiges Entfernen aus dem HUD erzwingen
+                if (player != null && player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
+                {
+                    player.Buffs.RemoveBuff("buffEinmaligerSpawnProgress");
+                }
+            }
+            else
+            {
+                Log.Warning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es progressbuff on' oder 'es progressbuff off'.");
+            }
+        }
+
+        // -----------------------------------------------------------------
         // BEFEHL: es range
         // -----------------------------------------------------------------
         private void CmdRange(EntityPlayerLocal player, List<string> _params)
@@ -341,50 +427,11 @@ namespace EinmaligerSpawn.Commands
                 int.TryParse(_params[1], out radiusMeter);
             }
 
-            Vector3i playerPos = player.GetBlockPosition();
-            int px = playerPos.x;
-            int pz = playerPos.z;
-
-            int playerChunkX = px >> 4;
-            int playerChunkZ = pz >> 4;
-
-            int chunkSuchRadius = Mathf.CeilToInt((float)radiusMeter / 16f);
-            int maxDistSq = radiusMeter * radiusMeter;
-
-            int x_Gesperrt = 0;
-            int y_Gesamt = 0;
-
-            for (int cx = playerChunkX - chunkSuchRadius; cx <= playerChunkX + chunkSuchRadius; cx++)
-            {
-                for (int cz = playerChunkZ - chunkSuchRadius; cz <= playerChunkZ + chunkSuchRadius; cz++)
-                {
-                    int minX = cx * 16;
-                    int maxX = minX + 15;
-                    int minZ = cz * 16;
-                    int maxZ = minZ + 15;
-
-                    int dx = Math.Max(0, Math.Max(minX - px, px - maxX));
-                    int dz = Math.Max(0, Math.Max(minZ - pz, pz - maxZ));
-
-                    if (dx * dx + dz * dz <= maxDistSq)
-                    {
-                        y_Gesamt++;
-                        string chunkId = $"{cx}_{cz}";
-
-                        if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) &&
-                            KillCounter.ToteZombiesProChunk[chunkId] >= 1)
-                        {
-                            x_Gesperrt++;
-                        }
-                    }
-                }
-            }
-
-            float prozentFloat = y_Gesamt > 0 ? ((float)x_Gesperrt / y_Gesamt) * 100f : 0f;
-            int prozent = Mathf.RoundToInt(prozentFloat);
+            // Wir holen uns die Werte sauber aus der neuen zentralen Methode
+            var ergebnis = KillCounter.BerechneLokalenFortschritt(player, radiusMeter);
 
             Log.Out($"=== Spawn-Radar ({radiusMeter}m) ===");
-            Log.Out($"Status: {x_Gesperrt}/{y_Gesamt} ({prozent}%)");
+            Log.Out($"Status: {ergebnis.gesperrt}/{ergebnis.gesamt} ({ergebnis.prozent}%)");
         }
 
         // -----------------------------------------------------------------

@@ -14,6 +14,7 @@ namespace EinmaligerSpawn.Config
         public static bool LootbagMarkerAktiv = false;
         public static float SpawnCheckIntervall = 5f;
         public static bool TaktischerKillAktiv = true;
+        public static bool ZeigeLokalenFortschritt = true;
 
         public static void Laden(string saveDir)
         {
@@ -33,6 +34,7 @@ namespace EinmaligerSpawn.Config
                         LootbagMarkerAktiv = config.LootbagMarkerAktiv;
                         SpawnCheckIntervall = config.SpawnCheckIntervall;
                         TaktischerKillAktiv = config.TaktischerKillAktiv;
+                        ZeigeLokalenFortschritt = config.ZeigeLokalenFortschritt;
                     }
                 }
                 catch (Exception e)
@@ -50,6 +52,7 @@ namespace EinmaligerSpawn.Config
                 LootbagMarkerAktiv = false;
                 SpawnCheckIntervall = 5f;
                 TaktischerKillAktiv = true;
+                ZeigeLokalenFortschritt = true;
             }
         }
 
@@ -63,6 +66,7 @@ namespace EinmaligerSpawn.Config
             {
                 var config = new ConfigDaten
                 {
+                    // alphabetische Reihenfolge der Eigenschaften
                     ChatNachrichtenAktiv = ChatNachrichtenAktiv,
                     GlobalesZombieLimit = GlobalesZombieLimit,
                     KartenOverlayAktiv = KartenOverlayAktiv,
@@ -70,6 +74,7 @@ namespace EinmaligerSpawn.Config
                     LootbagMarkerAktiv = LootbagMarkerAktiv,
                     SpawnCheckIntervall = SpawnCheckIntervall,
                     TaktischerKillAktiv = TaktischerKillAktiv,
+                    ZeigeLokalenFortschritt = ZeigeLokalenFortschritt,
                 };
                 string json = JsonConvert.SerializeObject(config, Formatting.Indented);
                 File.WriteAllText(configPfad, json);
@@ -89,6 +94,7 @@ namespace EinmaligerSpawn.Config
             public bool LootbagMarkerAktiv { get; set; } = false;
             public float SpawnCheckIntervall { get; set; } = 15f;
             public bool TaktischerKillAktiv { get; set; } = true;
+            public bool ZeigeLokalenFortschritt { get; set; } = true;
         }
     }
 }

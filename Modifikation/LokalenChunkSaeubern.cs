@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.Network;
 using UnityEngine;
 
 namespace EinmaligerSpawn.LocalClear
@@ -17,7 +18,7 @@ namespace EinmaligerSpawn.LocalClear
 
         private static Dictionary<int, TrackingDaten> spielerTracking = new Dictionary<int, TrackingDaten>();
 
-        // NEU: Speichert dauerhaft, ob ein Spieler seinen Schutz verloren hat (Performance-Boost)
+        // Speichert dauerhaft, ob ein Spieler seinen Schutz verloren hat (Performance-Boost)
         private static Dictionary<int, bool> playerProtectionLost = new Dictionary<int, bool>();
 
         private static float checkTimer = 0f; // Timer zum Drosseln der Update-Frequenz
@@ -64,6 +65,11 @@ namespace EinmaligerSpawn.LocalClear
             if (!ModEinstellungen.LokalerChunkClearAktiv)
                 return;
 
+            // Abbruch, wenn wir nicht auf dem Server sind (Client-Only)
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                return;
+
+            // Abbruch, wenn die Welt oder Spieler noch nicht initialisiert sind
             if (GameManager.Instance == null || GameManager.Instance.World == null || GameManager.Instance.World.Players == null)
                 return;
 
@@ -159,6 +165,11 @@ namespace EinmaligerSpawn.LocalClear
             if (ModEinstellungen.KartenOverlayAktiv)
             {
                 KartenOverlay.ErzwingeRedraw();
+            }
+
+            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
             }
 
             return true;

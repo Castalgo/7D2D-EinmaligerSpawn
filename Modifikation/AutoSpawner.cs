@@ -3,6 +3,7 @@ using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
 using UnityEngine;
+using Webserver.WebAPI.APIs.WorldState;
 
 namespace EinmaligerSpawn.ZombieSpawner
 {
@@ -63,12 +64,40 @@ namespace EinmaligerSpawn.ZombieSpawner
             if (currentZombies >= ModEinstellungen.GlobalesZombieLimit)
                 return;
 
-            // -------------------------------------------------------------
-            // 2. Anfänger-Schutz-Buff
-            // -------------------------------------------------------------
+            
 
             foreach (EntityPlayer player in players)
             {
+                // -------------------------------------------------------------
+                // 2. Lokaler Fortschritts-Buff (für das Icon)
+                // -------------------------------------------------------------
+                if (ModEinstellungen.ZeigeLokalenFortschritt)
+                {
+                    // 1. Buff verteilen, falls er fehlt
+                    if (!player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
+                    {
+                        player.Buffs.AddBuff("buffEinmaligerSpawnProgress");
+                    }
+
+                    // 2. Prozentwert berechnen (Radius 120 entspricht dem Standard)
+                    var fortschritt = KillCounter.BerechneLokalenFortschritt(player, 120);
+
+                    // 3. Den Wert in die CVar für das Icon schreiben
+                    player.Buffs.SetCustomVar("esLocalClearPercent", fortschritt.prozent, true);
+                }
+                else
+                {
+                    // Entfernen, falls in den Einstellungen deaktiviert
+                    if (player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
+                    {
+                        player.Buffs.RemoveBuff("buffEinmaligerSpawnProgress");
+                    }
+                }
+                
+                // -------------------------------------------------------------
+                // 2a. Anfänger-Schutz-Buff
+                // -------------------------------------------------------------
+
                 int pid = player.entityId;
 
                 if (!playerSpawnTimers.ContainsKey(pid))
@@ -138,7 +167,11 @@ namespace EinmaligerSpawn.ZombieSpawner
                 }
             }
 
-            if (aktiveSpieler.Count == 0) return; // Niemand braucht Rechenleistung
+            if (aktiveSpieler.Count == 0)
+            {
+                Log.Out($"[AutoSpawner-DEBUG] Background-Scan abgeschlossen. Alle Spieler sind in '_UmgebungFertig'-Chunks.");
+                return; // Niemand braucht Rechenleistung
+            }
 
             // ==========================================
             // SCHRITT 2: WERTE BERECHNEN (Listen bauen)
@@ -210,7 +243,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                     if (verbrauchteCoins >= playerBudget) break;
 
                     string targetId = $"{gewaehlterChunk.x}_{gewaehlterChunk.z}";
-                    //Log.Out($"[AutoSpawner-DEBUG] Führe Tiefen-Scan für Chunk {targetId} bei Spieler '{player.EntityName}' aus...");
+                    Log.Out($"[AutoSpawner-DEBUG] Führe Tiefen-Scan für Chunk {targetId} bei Spieler '{player.EntityName}' aus...");
 
                     bool isSpawntauglich = PruefeUndSpeichereChunk(gewaehlterChunk.x, gewaehlterChunk.z);
                     verbrauchteCoins++;
@@ -219,8 +252,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                     if (isSpawntauglich)
                     {
                         spawntauglichGefunden = true;
-                        //Log.Out($"[AutoSpawner-DEBUG] Chunk {targetId} ist spawntauglich. Suche für '{player.EntityName}' beendet.");
-                        //Log.Out($"[AutoSpawner-DEBUG] Chunk {targetId} ist spawntauglich. Suche für '{player.EntityName}' beendet.");
+                        Log.Out($"[AutoSpawner-DEBUG] Chunk {targetId} ist spawntauglich. Suche für '{player.EntityName}' beendet.");
                         break;
                     }
                 }
@@ -238,7 +270,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                     {
                         ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Spawntauglich_UmgebungFertig;
                     }
-                    //Log.Out($"[AutoSpawner-DEBUG] Umgebung um {centerChunkId} vollständig gescannt.");
+                    Log.Out($"[AutoSpawner-DEBUG] Umgebung um {centerChunkId} vollständig gescannt.");
                 }
             }
         }
@@ -255,7 +287,7 @@ namespace EinmaligerSpawn.ZombieSpawner
             if (biome == null || !BiomeSpawningClass.list.ContainsKey(biome.m_sBiomeName))
             {
                 KillCounter.ToteZombiesProChunk[chunkId] = 1;
-                Log.Out($"[AutoSpawner] Chunk {chunkId} ist unbewohnbar (Kein Biom/Spawn-Gruppe) und wurde automatisch als gecleart markiert.");
+                Log.Warning($"[AutoSpawner] Chunk {chunkId} ist unbewohnbar (Kein Biom/Spawn-Gruppe) und wurde automatisch als gecleart markiert.");
 
                 if (ModEinstellungen.KartenOverlayAktiv)
                 {
@@ -296,7 +328,7 @@ namespace EinmaligerSpawn.ZombieSpawner
             else
             {
                 KillCounter.ToteZombiesProChunk[chunkId] = 1;
-                Log.Out($"[AutoSpawner] Chunk {chunkId} ist unbewohnbar (Wasser/Steilwand/POI) und wurde automatisch als gecleart markiert.");
+                Log.Warning($"[AutoSpawner] Chunk {chunkId} ist unbewohnbar (Wasser/Steilwand/POI) und wurde automatisch als gecleart markiert.");
 
                 if (ModEinstellungen.KartenOverlayAktiv)
                 {
@@ -511,6 +543,14 @@ namespace EinmaligerSpawn.ZombieSpawner
             if (ChunkSpawnbarkeitCache != null) ChunkSpawnbarkeitCache.Clear();
 
             Log.Out("[AutoSpawner] Interner Cache und Timer wurden erfolgreich für die neue Sitzung geleert.");
+        }
+
+        public static void RemoveChunkFromCache(string chunkId) // nötig für command "es cheat_clear reset"
+        {
+            if (ChunkSpawnbarkeitCache != null && ChunkSpawnbarkeitCache.ContainsKey(chunkId))
+            {
+                ChunkSpawnbarkeitCache.Remove(chunkId);
+            }
         }
     }
 }

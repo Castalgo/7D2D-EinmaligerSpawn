@@ -1,8 +1,10 @@
-﻿using EinmaligerSpawn.ChunkDatenbank;
+﻿using System.Collections.Generic;
+using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config; 
 using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.LocalClear;
 using EinmaligerSpawn.LootBagMarker;
+using EinmaligerSpawn.Network;
 using EinmaligerSpawn.ZombieSpawner;
 using HarmonyLib;
 
@@ -99,6 +101,36 @@ namespace EinmaligerSpawn.SaveLoadPatches
             }
             if (KillCounter.ToteZombiesProChunk != null)
                 KillCounter.ToteZombiesProChunk.Clear();
+        }
+    }
+
+    // Patch für das Senden der Begrüßungs-Daten beim Login eines Mitspielers
+    [HarmonyPatch(typeof(GameManager), "PlayerSpawnedInWorld")]
+    public class Patch_PlayerSpawnedInWorld
+    {
+        [HarmonyPostfix]
+        public static void Postfix(ClientInfo _cInfo, RespawnType _respawnReason, Vector3i _pos, int _entityId)
+        {
+            // 1. Sicherheitscheck: Nur der Server darf Daten verschicken!
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+
+            // 2. Ist es überhaupt ein externer Mitspieler (Client)? 
+            // (Wenn der Host selbst spawnt, ist _cInfo = null. Der Host hat die Daten ja eh schon im RAM)
+            if (_cInfo == null) return;
+
+            // 3. Wir holen uns alle Chunk-Namen (Keys), die der Server in seinem Gedächtnis hat
+            List<string> alleChunks = new List<string>(KillCounter.ToteZombiesProChunk.Keys);
+
+            // 4. Wenn die Welt noch komplett frisch ist, müssen wir nichts schicken
+            if (alleChunks.Count == 0) return;
+
+            // 5. Briefumschlag packen (Phase 1 Konstruktor mit der kompletten Liste)
+            NetPackageChunkSync package = new NetPackageChunkSync(alleChunks);
+
+            // 6. Das Paket GANZ GEZIELT nur an diesen einen Spieler senden
+            _cInfo.SendPackage(package);
+
+            Log.Out($"[EinmaligerSpawn] Netzwerk: Sende komplettes Chunk-Gedächtnis ({alleChunks.Count} Einträge) an Spieler {_cInfo.playerName}...");
         }
     }
 

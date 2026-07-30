@@ -24,8 +24,10 @@ Ziele der Mod EinmaligerSpawn (Version 3.x.x)
 - zusätzliche Möglichkeiten Chunks zu säubern: Durchlaufen, Kitten.
 - An- und Abschalten von Hinweistexten der Mod
   
-  
-  
+
+
 Idee für zukünftige Erweiterung
 ----------------------------------------------------------------
+- Autospawner: Fix oder regulär, dass er einige Chunks als "unspawnbar" deklariert ?
 - "easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen
+- Prozent der Karte gecleart als Fortschritt

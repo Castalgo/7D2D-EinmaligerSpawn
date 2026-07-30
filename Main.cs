@@ -1,7 +1,8 @@
 ﻿using System.Reflection;
-using EinmaligerSpawn.LootBagMarker;
-using EinmaligerSpawn.ZombieSpawner;
 using EinmaligerSpawn.LocalClear;
+using EinmaligerSpawn.LootBagMarker;
+using EinmaligerSpawn.Network;
+using EinmaligerSpawn.ZombieSpawner;
 using HarmonyLib;
 using UnityEngine;
 
@@ -15,6 +16,8 @@ namespace EinmaligerSpawn
 
             var harmony = new Harmony("com.castalgo.einmaligerspawn");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
+
+            // Dem Spiel unser neues Netzwerk-Paket offiziell bekannt machen
 
             // Patch für alle gemoddeten Änderungen, die auf GameUpdate angewiesen sind
             ModEvents.GameUpdate.RegisterHandler((ref ModEvents.SGameUpdateData data) =>

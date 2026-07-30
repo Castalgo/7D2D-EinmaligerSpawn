@@ -4,8 +4,9 @@ using System.IO;
 using Newtonsoft.Json;
 using UnityEngine;
 using System.Linq;
-using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.Config;
+using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.Network;
 
 namespace EinmaligerSpawn.ChunkDatenbank
 {
@@ -50,6 +51,11 @@ namespace EinmaligerSpawn.ChunkDatenbank
                     KartenOverlay.ErzwingeRedraw();
                 }
 
+                if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                {
+                    SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
+                }
+
             }
         }
 
@@ -66,10 +72,15 @@ namespace EinmaligerSpawn.ChunkDatenbank
             // Chunk auf gesäubert setzen
             ToteZombiesProChunk[chunkId] = 1;
 
-            // NEU: Live-Update für die Karte auslösen
+            // Live-Update für die Karte auslösen
             if (KartenOverlay.IstAktiv)
             {
                 KartenOverlay.ErzwingeRedraw();
+            }
+
+            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
             }
 
             // Chatnachricht und Konsole vorbereiten
@@ -147,6 +158,53 @@ namespace EinmaligerSpawn.ChunkDatenbank
             {
                 Log.Error($"[EinmaligerSpawn] Fehler beim Speichern der Chunks: {e.Message}");
             }
+        }
+
+        // Berechnet den prozentualen Clear-Status in einem bestimmten Umkreis
+        public static (int gesperrt, int gesamt, int prozent) BerechneLokalenFortschritt(EntityPlayer player, int radiusMeter = 120)
+        {
+            Vector3i playerPos = player.GetBlockPosition();
+            int px = playerPos.x;
+            int pz = playerPos.z;
+
+            int playerChunkX = px >> 4;
+            int playerChunkZ = pz >> 4;
+
+            int chunkSuchRadius = Mathf.CeilToInt((float)radiusMeter / 16f);
+            int maxDistSq = radiusMeter * radiusMeter;
+
+            int x_Gesperrt = 0;
+            int y_Gesamt = 0;
+
+            for (int cx = playerChunkX - chunkSuchRadius; cx <= playerChunkX + chunkSuchRadius; cx++)
+            {
+                for (int cz = playerChunkZ - chunkSuchRadius; cz <= playerChunkZ + chunkSuchRadius; cz++)
+                {
+                    int minX = cx * 16;
+                    int maxX = minX + 15;
+                    int minZ = cz * 16;
+                    int maxZ = minZ + 15;
+
+                    int dx = Math.Max(0, Math.Max(minX - px, px - maxX));
+                    int dz = Math.Max(0, Math.Max(minZ - pz, pz - maxZ));
+
+                    if (dx * dx + dz * dz <= maxDistSq)
+                    {
+                        y_Gesamt++;
+                        string chunkId = $"{cx}_{cz}";
+
+                        if (ToteZombiesProChunk.ContainsKey(chunkId) && ToteZombiesProChunk[chunkId] >= 1)
+                        {
+                            x_Gesperrt++;
+                        }
+                    }
+                }
+            }
+
+            float prozentFloat = y_Gesamt > 0 ? ((float)x_Gesperrt / y_Gesamt) * 100f : 0f;
+            int prozent = Mathf.RoundToInt(prozentFloat);
+
+            return (x_Gesperrt, y_Gesamt, prozent);
         }
     }
 }
