@@ -3,6 +3,10 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Build Verzeichnis und Mod Release
+Mods/
+*.zip
+
 # User-specific files
 *.rsuser
 *.suo

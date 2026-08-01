@@ -8,7 +8,11 @@ Die Mod registriert, wenn du einen Chunk oder ein POI von Zombies gesäubert has
 Aktuell befindet sich das Projekt in der Alpha-Phase (es ist die erste spielbare Alpha-Version) und wurde bisher nur im aktuellen Build getestet.
 
 ## Installation
-Platziere den Ordner `Mods/EinmaligerSpawn` einfach in deinem Mod-Verzeichnis unter `C:\Users\yourCurrentUserprofilename\AppData\Roaming\7DaysToDie\Mods\`.
+1. Lade dir die aktuellste Version der Mod hier herunter: [EinmaligerSpawn Release](../../releases/tag/EinmaligerSpawn)
+2. Entpacke die heruntergeladene ZIP-Datei.
+3. Platziere den entpackten Ordner `Mods` in deinem Mod-Verzeichnis unter `%AppData%\7DaysToDie\`.
+
+Die Mod ist rein client seitig und braucht nicht auf dem Server installiert werden. Diese Mod unterstütz kein EAC, d. h. der Server muss EAC abgeschaltet haben.
 
 ---
 
@@ -67,3 +71,6 @@ Die Mod bringt eine Reihe eigener Befehle für die Ingame-Konsole mit. Alle Befe
 *   `es msg <on/off>`: Um die globalen Chat-Nachrichten der Mod für alle ein- oder auszuschalten.
 *   `es tactical <on/off>`: Um den serverseitigen Bonus-Clear (Taktischer Kill) ein- oder auszuschalten.
 *   `es timer <Sekunden>`: Um das serverseitige Autospawn-Überprüfungsintervall anzupassen.
+
+---
+This mod uses Harmony by Andreas Pardeike, licensed under the MIT License. Many thanks for his work.

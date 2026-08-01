@@ -151,7 +151,7 @@ namespace EinmaligerSpawn.ZombieSpawner
 
             if (aktiveSpieler.Count == 0)
             {
-                Log.Out($"[AutoSpawner-DEBUG] Background-Scan abgeschlossen. Alle Spieler sind in '_UmgebungFertig'-Chunks.");
+                Log.Out($"[AutoSpawner-DEBUG] Background-Scan abgeschlossen. Alle Spieler sind in '_UmgebungFertigGescannt'-Chunks.");
                 return; // Niemand braucht Rechenleistung
             }
 
@@ -558,7 +558,7 @@ namespace EinmaligerSpawn.ZombieSpawner
             // Fehler-Reporting, falls kein Spawn durchgeführt werden konnte
             if (!irgeneinChunkGeladen)
             {
-                Log.Out($"{logPrefix} Konnte keinen Zombie für '{player.EntityName}' erzeugen, weil keine Chunks geladen sind.");
+                Log.Out($"{logPrefix} Konnte keinen Zombie für '{player.EntityName}' erzeugen, weil keine Chunks infrage kommen.");
             }
             else
             {

@@ -30,5 +30,46 @@
            Condition="'$(RobocopyExitCode)' &gt;= '8'" />
 
   </Target>
+  
+  <Target Name="CreateReleaseZip" AfterTargets="CopyToGameFolder">
+    
+    <!-- 1. Version auslesen -->
+    <XmlPeek XmlInputPath="$(RoboDest)\ModInfo.xml" Query="/ModInfo/Version/@value">
+      <Output TaskParameter="Result" ItemName="ExtractedVersion" />
+    </XmlPeek>
+
+    <PropertyGroup>
+      <ModVersion>@(ExtractedVersion)</ModVersion>
+      <ZipDestination>$(MSBuildThisFileDirectory)EinmaligerSpawn v$(ModVersion).zip</ZipDestination>
+      <!-- Der temporäre Zwischenordner für den sauberen Zip-Vorgang -->
+      <StagingFolder>$(MSBuildThisFileDirectory)ZipStaging\</StagingFolder>
+    </PropertyGroup>
+
+    <Message Text="[EinmaligerSpawn] Bereite Dateien für das ZIP-Archiv vor..." Importance="high" />
+
+    <!-- 2. Vorab aufräumen, falls ein alter Zwischenordner existiert -->
+    <RemoveDir Directories="$(StagingFolder)" />
+
+    <!-- 3. Alle Dateien aus deinem fertigen Mods-Ordner erfassen -->
+    <ItemGroup>
+      <FilesToZip Include="$(MSBuildThisFileDirectory)Mods\**\*.*" />
+    </ItemGroup>
+
+    <!-- 4. Dateien in den Zwischenordner kopieren, und zwar explizit in einen Unterordner namens "Mods" -->
+    <Copy SourceFiles="@(FilesToZip)" 
+          DestinationFiles="@(FilesToZip->'$(StagingFolder)Mods\%(RecursiveDir)%(Filename)%(Extension)')" />
+
+    <Message Text="[EinmaligerSpawn] Erstelle Release-Zip: $(ZipDestination)" Importance="high" />
+
+    <!-- 5. Den gesamten Zwischenordner zippen (enthält nun genau den Überordner "Mods") -->
+    <ZipDirectory 
+        SourceDirectory="$(StagingFolder)" 
+        DestinationFile="$(ZipDestination)" 
+        Overwrite="true" />
+
+    <!-- 6. Den temporären Zwischenordner sofort wieder restlos von der Festplatte löschen -->
+    <RemoveDir Directories="$(StagingFolder)" />
+        
+  </Target>
 
 </Project>

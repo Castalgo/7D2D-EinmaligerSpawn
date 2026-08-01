@@ -8,7 +8,11 @@ The mod tracks when you have cleared a chunk or a POI of zombies and permanently
 Currently, the project is in its alpha phase (this is the first playable alpha version) and has only been tested on the current build.
 
 ## Installation
-Simply place the `Mods/EinmaligerSpawn` folder into your mod directory at `C:\Users\yourCurrentUserprofilename\AppData\Roaming\7DaysToDie\Mods\`.
+1. Download the latest version of the mod here: [EinmaligerSpawn Release](../../releases/tag/EinmaligerSpawn)
+2. Extract the downloaded ZIP file.
+3. Place the extracted `Mods` folder in your mods directory under `%AppData%\7DaysToDie\`.
+
+The mod is purely client-side and does not need to be installed on the server. This mod does not support EAC, which means the server must have EAC disabled.
 
 ---
 
@@ -67,3 +71,6 @@ The mod comes with several custom commands for the in-game console. All commands
 *   `es msg <on/off>`: Enables or disables the global chat messages of the mod for everyone.
 *   `es tactical <on/off>`: Enables or disables the server-side bonus clear (Place of Death).
 *   `es timer <seconds>`: Adjusts the server-side AutoSpawn check interval.
+
+---
+This mod uses Harmony by Andreas Pardeike, licensed under the MIT License. Many thanks for his work.
