@@ -18,7 +18,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath><OutputPath>$(AppData)\7DaysToDie\Mods\EinmaligerSpawn\</OutputPath>
+    <OutputPath>$(AppData)\7DaysToDie\Mods\EinmaligerSpawn\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -82,13 +82,13 @@
     <Compile Include="Modifikation\AutoSpawner.cs" />
     <Compile Include="Modifikation\DynamischesSpawnLimit.cs" />
     <Compile Include="Main.cs" />
+    <Compile Include="Modifikation\FortschrittsBuff.cs" />
     <Compile Include="Modifikation\Network.cs" />
     <Compile Include="Modifikation\SpawnBlocker.cs" />
     <Compile Include="Modifikation\KillCounter.cs" />
     <Compile Include="Modifikation\KartenOverlay.cs" />
     <Compile Include="Modifikation\KonsolenBefehle.cs" />
     <Compile Include="Modifikation\LokalenChunkSaeubern.cs" />
-    <Compile Include="Modifikation\LootBagMarker.cs" />
     <Compile Include="Modifikation\ModEinstellungen.cs" />
     <Compile Include="Modifikation\Trader_Quest_Filter_Patch.cs" />
     <Compile Include="Modifikation\POI_Sleeper_Kontrolle.cs" />
@@ -123,4 +123,5 @@
     <Folder Include="Debug\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="EinmaligerSpawn.local.targets" Condition="Exists('EinmaligerSpawn.local.targets')" />
 </Project>

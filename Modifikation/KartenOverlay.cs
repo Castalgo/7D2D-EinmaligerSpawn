@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using HarmonyLib;
@@ -46,10 +47,10 @@ namespace EinmaligerSpawn.KartenOverlayManager
             }
         }
 
-        // NEU: Die Berechnung sitzt jetzt direkt hier im KartenOverlay
+        // Berechnet den globalen Fortschritt: Anzahl der gesperrten Chunks / Gesamtanzahl der Chunks
         public static (int gesperrt, int gesamt, string prozentString) BerechneGlobalenFortschritt()
         {
-            // Holt die dynamische Kartengröße (z.B. 6144)
+            // Kartengröße der Welt auslesen (z.B. 6144)
             int worldSize = GamePrefs.GetInt(EnumGamePrefs.WorldGenSize);
 
             // Die Kantenlänge in Chunks + dein definierter Puffer von 2 Chunks (1 pro Seite)
@@ -95,6 +96,7 @@ namespace EinmaligerSpawn.KartenOverlayManager
             }
         }
 
+        // Zeichnung der Welt-Eroberung: {Prozente} {gecleart} / {Gesamt}
         void OnGUI()
         {
             if (style == null)
@@ -162,6 +164,7 @@ namespace EinmaligerSpawn.KartenOverlayManager
             KartenOverlay.AktuelleMapArea = null;
         }
 
+        // Der eigentliche Patch, der die Map-Textur nachträglich einfärbt
         [HarmonyPatch("updateMapSection")]
         [HarmonyPostfix]
         public static void UpdateMapSectionPostfix(

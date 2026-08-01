@@ -2,17 +2,21 @@
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.Network;
 using UnityEngine;
-using Webserver.WebAPI.APIs.WorldState;
 
 namespace EinmaligerSpawn.ZombieSpawner
 {
+    // ==================================================================================
+    // Chunk-Scan-Status. Sagt NICHTS über die Nachbarn aus, sondern nur über den Chunk selbst.
+    // ==================================================================================
     public enum ChunkScanStatus
     {
         Unbekannt = 0,
         Spawntauglich = 1,
-        Spawntauglich_UmgebungFertig = 2,
-        Gesaeubert_UmgebungFertig = 3
+        Spawntauglich_UmgebungFertigGescannt = 2,
+        Gesaeubert_UmgebungFertigGescannt = 3,
+        Gesaeubert_UmgebungGecleart = 4
     }
 
     public static class AutoSpawner
@@ -27,15 +31,21 @@ namespace EinmaligerSpawn.ZombieSpawner
 
         public static void OnGameUpdate()
         {
+            // Spiel überhaupt geladen?
             if (GameManager.Instance == null || GameManager.Instance.World == null || GameManager.Instance.World.Players == null)
                 return;
 
+            // Bist du der Server? (Clienten sollen keine Zombies spawnen)
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                return;
+
+            // Zeitgeber um nur alle X Sekunden ausgeführt zu werden (Drosselung)
             timeSinceLastCheck += Time.deltaTime;
             if (timeSinceLastCheck < ModEinstellungen.SpawnCheckIntervall)
                 return;
 
-            float passedTime = timeSinceLastCheck;
-            timeSinceLastCheck = 0f;
+            float passedTime = timeSinceLastCheck; // für Anfänger-Schutz-Buff nötig
+            timeSinceLastCheck = 0f; // Zeit zurücksetzen
 
             int currentZombies = 0;
             foreach (Entity entity in GameManager.Instance.World.Entities.list)
@@ -63,41 +73,13 @@ namespace EinmaligerSpawn.ZombieSpawner
             // =====================================================================
             if (currentZombies >= ModEinstellungen.GlobalesZombieLimit)
                 return;
-
             
+            // -------------------------------------------------------------
+            // 2. Anfänger-Schutz-Buff
+            // -------------------------------------------------------------
 
             foreach (EntityPlayer player in players)
             {
-                // -------------------------------------------------------------
-                // 2. Lokaler Fortschritts-Buff (für das Icon)
-                // -------------------------------------------------------------
-                if (ModEinstellungen.ZeigeLokalenFortschritt)
-                {
-                    // 1. Buff verteilen, falls er fehlt
-                    if (!player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
-                    {
-                        player.Buffs.AddBuff("buffEinmaligerSpawnProgress");
-                    }
-
-                    // 2. Prozentwert berechnen (Radius 120 entspricht dem Standard)
-                    var fortschritt = KillCounter.BerechneLokalenFortschritt(player, 120);
-
-                    // 3. Den Wert in die CVar für das Icon schreiben
-                    player.Buffs.SetCustomVar("esLocalClearPercent", fortschritt.prozent, true);
-                }
-                else
-                {
-                    // Entfernen, falls in den Einstellungen deaktiviert
-                    if (player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
-                    {
-                        player.Buffs.RemoveBuff("buffEinmaligerSpawnProgress");
-                    }
-                }
-                
-                // -------------------------------------------------------------
-                // 2a. Anfänger-Schutz-Buff
-                // -------------------------------------------------------------
-
                 int pid = player.entityId;
 
                 if (!playerSpawnTimers.ContainsKey(pid))
@@ -143,7 +125,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                 if (playerSpawnTimers[pid] >= requiredInterval)
                 {
                     playerSpawnTimers[pid] = 0f;
-                    FuehreSpawnAus(player, 1, currentZombies);
+                    FuehreSpawnAus(player, currentZombies);
                 }
             }
         }
@@ -151,9 +133,9 @@ namespace EinmaligerSpawn.ZombieSpawner
         private static void ScanBackground(List<EntityPlayer> players)
         {
 
-            // ==========================================
-            // SCHRITT 1: VORFILTERN (AFK-Spieler rauswerfen)
-            // ==========================================
+            // ====================================================================================
+            // SCHRITT 1: VORFILTERN (Spieler die in gescannten Arealen sind rauswerfen)
+            // ====================================================================================
             List<EntityPlayer> aktiveSpieler = new List<EntityPlayer>();
             foreach (EntityPlayer p in players)
             {
@@ -161,7 +143,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                 string centerId = $"{pos.x >> 4}_{pos.z >> 4}";
 
                 if (!ChunkSpawnbarkeitCache.TryGetValue(centerId, out ChunkScanStatus status) ||
-                    (status != ChunkScanStatus.Spawntauglich_UmgebungFertig && status != ChunkScanStatus.Gesaeubert_UmgebungFertig))
+                    (status != ChunkScanStatus.Spawntauglich_UmgebungFertigGescannt && status != ChunkScanStatus.Gesaeubert_UmgebungFertigGescannt))
                 {
                     aktiveSpieler.Add(p);
                 }
@@ -199,8 +181,22 @@ namespace EinmaligerSpawn.ZombieSpawner
                             int targetCz = playerChunkZ + z;
                             string chunkId = $"{targetCx}_{targetCz}";
 
-                            if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1) continue;
+                            // 1. RAM-Check: Wurde der Chunk in dieser Session schon geprüft?
                             if (ChunkSpawnbarkeitCache.ContainsKey(chunkId)) continue;
+
+                            // 2. Datenbank-Check (Langzeitgedächtnis)
+                            if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills))
+                            {
+                                if (kills >= 1) continue; // Chunk ist ausgerottet -> Überspringen
+
+                                if (kills == 0)
+                                {
+                                    // Chunk ist laut Datenbank spawntauglich! 
+                                    // Wir sparen uns den rechenintensiven Block-Scan und laden ihn direkt in den RAM.
+                                    ChunkSpawnbarkeitCache[chunkId] = ChunkScanStatus.Spawntauglich;
+                                    continue; // Nächster Kandidat
+                                }
+                            }
 
                             Chunk physChunk = (Chunk)GameManager.Instance.World.ChunkCache.GetChunkSync(targetCx, targetCz);
                             if (physChunk == null) continue;
@@ -222,139 +218,168 @@ namespace EinmaligerSpawn.ZombieSpawner
             }
 
             // ==========================================
-            // SCHRITT 3: COINS VERTEILEN
+            // SCHRITT 3: TICKETS VERTEILEN (Round-Robin)
             // ==========================================
-            int totalCoins = 30;
-            int remainingPlayers = aktiveSpieler.Count;
+            int remainingTickets = 800;
 
-            foreach (EntityPlayer player in aktiveSpieler)
+            // Warteschlangen für faires Abwechseln bauen
+            Dictionary<EntityPlayer, Queue<Vector3i>> spielerWarteschlangen = new Dictionary<EntityPlayer, Queue<Vector3i>>();
+            List<EntityPlayer> aktiveRoundRobinSpieler = new List<EntityPlayer>();
+
+            foreach (var kvp in spielerKandidaten)
             {
-                if (totalCoins <= 0) break;
-
-                int playerBudget = totalCoins / remainingPlayers;
-                remainingPlayers--;
-
-                List<Vector3i> kandidaten = spielerKandidaten[player];
-                int verbrauchteCoins = 0;
-                bool spawntauglichGefunden = false;
-
-                foreach (Vector3i gewaehlterChunk in kandidaten)
+                if (kvp.Value.Count > 0)
                 {
-                    if (verbrauchteCoins >= playerBudget) break;
-
-                    string targetId = $"{gewaehlterChunk.x}_{gewaehlterChunk.z}";
-                    Log.Out($"[AutoSpawner-DEBUG] Führe Tiefen-Scan für Chunk {targetId} bei Spieler '{player.EntityName}' aus...");
-
-                    bool isSpawntauglich = PruefeUndSpeichereChunk(gewaehlterChunk.x, gewaehlterChunk.z);
-                    verbrauchteCoins++;
-                    totalCoins--;
-
-                    if (isSpawntauglich)
-                    {
-                        spawntauglichGefunden = true;
-                        Log.Out($"[AutoSpawner-DEBUG] Chunk {targetId} ist spawntauglich. Suche für '{player.EntityName}' beendet.");
-                        break;
-                    }
+                    spielerWarteschlangen[kvp.Key] = new Queue<Vector3i>(kvp.Value);
+                    aktiveRoundRobinSpieler.Add(kvp.Key);
                 }
-
-                if (!spawntauglichGefunden && verbrauchteCoins == kandidaten.Count)
+                else
                 {
-                    Vector3i pos = player.GetBlockPosition();
+                    // Spieler hat keine Chunks mehr zum Prüfen -> Umgebung ist fertig
+                    Vector3i pos = kvp.Key.GetBlockPosition();
                     string centerChunkId = $"{pos.x >> 4}_{pos.z >> 4}";
 
                     if (KillCounter.ToteZombiesProChunk.ContainsKey(centerChunkId) && KillCounter.ToteZombiesProChunk[centerChunkId] >= 1)
-                    {
-                        ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Gesaeubert_UmgebungFertig;
-                    }
+                        ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Gesaeubert_UmgebungFertigGescannt;
                     else
-                    {
-                        ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Spawntauglich_UmgebungFertig;
-                    }
+                        ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Spawntauglich_UmgebungFertigGescannt;
+
                     Log.Out($"[AutoSpawner-DEBUG] Umgebung um {centerChunkId} vollständig gescannt.");
                 }
             }
+
+            // Round-Robin Schleife: Solange wir Tickets haben und Spieler noch Chunks prüfen wollen
+            while (remainingTickets > 0 && aktiveRoundRobinSpieler.Count > 0)
+            {
+                // Rückwärts-Schleife, um Spieler ohne offene Chunks sicher aus der Liste löschen zu können
+                for (int i = aktiveRoundRobinSpieler.Count - 1; i >= 0; i--)
+                {
+                    if (remainingTickets <= 0) break;
+
+                    EntityPlayer player = aktiveRoundRobinSpieler[i];
+                    Queue<Vector3i> warteschlange = spielerWarteschlangen[player];
+
+                    Vector3i gewaehlterChunk = warteschlange.Dequeue();
+
+                    int verbrauchteTickets = PruefeUndSpeichereChunk(gewaehlterChunk.x, gewaehlterChunk.z);
+                    remainingTickets -= verbrauchteTickets;
+
+                    // Wenn der Spieler keine Chunks mehr in seiner Warteschlange hat
+                    if (warteschlange.Count == 0)
+                    {
+                        Vector3i pos = player.GetBlockPosition();
+                        string centerChunkId = $"{pos.x >> 4}_{pos.z >> 4}";
+
+                        if (KillCounter.ToteZombiesProChunk.ContainsKey(centerChunkId) && KillCounter.ToteZombiesProChunk[centerChunkId] >= 1)
+                            ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Gesaeubert_UmgebungFertigGescannt;
+                        else
+                            ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Spawntauglich_UmgebungFertigGescannt;
+
+                        Log.Out($"[AutoSpawner-DEBUG] Umgebung um {centerChunkId} vollständig gescannt.");
+
+                        aktiveRoundRobinSpieler.RemoveAt(i);
+                    }
+                }
+            }
         }
-        // Gibt nun einen bool zurück, damit der Scanner weiß, ob er weitersuchen muss
-        private static bool PruefeUndSpeichereChunk(int cx, int cz)
+
+        // Gibt nun die Anzahl der verbrauchten Tickets (1 bis 54) zurück
+        private static int PruefeUndSpeichereChunk(int cx, int cz)
         {
             string chunkId = $"{cx}_{cz}";
             Chunk physChunk = (Chunk)GameManager.Instance.World.ChunkCache.GetChunkSync(cx, cz);
 
-            if (physChunk == null) return false;
+            if (physChunk == null) return 1; // 1 Ticket für einen schnellen Null-Check
 
             byte biomeId = physChunk.GetBiomeId(8, 8);
             BiomeDefinition biome = GameManager.Instance.World.Biomes.GetBiome(biomeId);
             if (biome == null || !BiomeSpawningClass.list.ContainsKey(biome.m_sBiomeName))
             {
-                KillCounter.ToteZombiesProChunk[chunkId] = 1;
-                Log.Warning($"[AutoSpawner] Chunk {chunkId} ist unbewohnbar (Kein Biom/Spawn-Gruppe) und wurde automatisch als gecleart markiert.");
+                if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                    KillCounter.ToteZombiesProChunk[chunkId] = 1;
 
-                if (ModEinstellungen.KartenOverlayAktiv)
-                {
+                if (!GameManager.IsDedicatedServer && ModEinstellungen.KartenOverlayAktiv)
                     KartenOverlay.ErzwingeRedraw();
-                }
-                return false;
+
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
+
+                return 54; // Biom ungültig -> Maximalstrafe (simuliert 54 Fehlschläge)
             }
 
-            int[] offsets = { 3, 8, 13 };
+            int verbrauchteTickets = 0;
             bool validSpawnFound = false;
             int minX = cx * 16;
             int minZ = cz * 16;
+            GameRandom rand = GameManager.Instance.World.GetGameRandom();
 
-            foreach (int locX in offsets)
+            // 54 Proben, exakt wie im echten Spawner
+            for (int i = 0; i < 54; i++)
             {
-                foreach (int locZ in offsets)
+                verbrauchteTickets++;
+                int localX;
+                int localZ;
+
+                if (i < 50)
                 {
-                    int y = (int)(physChunk.GetHeight(locX, locZ) + 1);
-
-                    if (physChunk.IsWater(locX, y - 1, locZ)) continue;
-                    if (!physChunk.CanMobsSpawnAtPos(locX, y, locZ, false, true)) continue;
-
-                    Vector3 worldPos = new Vector3(minX + locX, y, minZ + locZ);
-                    PrefabInstance prefab = GameManager.Instance.World.GetPOIAtPosition(worldPos, null, null);
-                    if (prefab != null) continue;
-
-                    validSpawnFound = true;
-                    break;
+                    localX = rand.RandomRange(0, 16);
+                    localZ = rand.RandomRange(0, 16);
                 }
-                if (validSpawnFound) break;
+                else
+                {
+                    // Die 4 Ecken prüfen
+                    if (i == 50) { localX = 0; localZ = 0; }
+                    else if (i == 51) { localX = 0; localZ = 15; }
+                    else if (i == 52) { localX = 15; localZ = 0; }
+                    else { localX = 15; localZ = 15; }
+                }
+
+                int y = (int)(physChunk.GetHeight(localX, localZ) + 1);
+
+                // Ist Wasser oder ein anderer unmöglicher Untergrund vorhanden?
+                if (physChunk.IsWater(localX, y - 1, localZ)) continue;
+                if (!physChunk.CanMobsSpawnAtPos(localX, y, localZ, false, true)) continue;
+
+                // prüfen ob wir im POI (Prefab) sind
+                Vector3 worldPos = new Vector3(minX + localX, y, minZ + localZ);
+                PrefabInstance prefab = GameManager.Instance.World.GetPOIAtPosition(worldPos, null, null);
+                if (prefab != null) continue;
+
+                validSpawnFound = true;
+                break;
             }
 
             if (validSpawnFound)
             {
                 ChunkSpawnbarkeitCache[chunkId] = ChunkScanStatus.Spawntauglich;
-                return true;
+
+                // Chunk in DB schreiben
+                if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                {
+                    KillCounter.ToteZombiesProChunk[chunkId] = 0;
+                }
+
+                return verbrauchteTickets; // z.B. 1, 3 oder 15 Tickets bei Erfolg
             }
             else
             {
-                KillCounter.ToteZombiesProChunk[chunkId] = 1;
-                Log.Warning($"[AutoSpawner] Chunk {chunkId} ist unbewohnbar (Wasser/Steilwand/POI) und wurde automatisch als gecleart markiert.");
+                if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                    KillCounter.ToteZombiesProChunk[chunkId] = 1;
 
-                if (ModEinstellungen.KartenOverlayAktiv)
-                {
+                if (!GameManager.IsDedicatedServer && ModEinstellungen.KartenOverlayAktiv)
                     KartenOverlay.ErzwingeRedraw();
-                }
-                return false;
+
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
+
+                return verbrauchteTickets; // Hier sind es die vollen 54 Tickets
             }
         }
 
-        public static void FuehreSpawnAus(EntityPlayer player, int requestedZombies, int currentZombies)
+        public static void FuehreSpawnAus(EntityPlayer player, int currentZombies)
         {
             Vector3i playerPos = player.GetBlockPosition();
             int playerChunkX = playerPos.x >> 4;
             int playerChunkZ = playerPos.z >> 4;
             string centerId = $"{playerChunkX}_{playerChunkZ}";
-
-            // ==========================================
-            // SPAM-SCHUTZ & EARLY EXIT
-            // ==========================================
-            if (ChunkSpawnbarkeitCache.TryGetValue(centerId, out ChunkScanStatus centerStatus))
-            {
-                if (centerStatus == ChunkScanStatus.Gesaeubert_UmgebungFertig)
-                {
-                    return;
-                }
-            }
 
             string logPrefix = $"[AutoSpawner] Globale Zombies ({currentZombies}/{ModEinstellungen.GlobalesZombieLimit}).";
 
@@ -389,17 +414,24 @@ namespace EinmaligerSpawn.ZombieSpawner
                     int targetCz = target.z;
                     string chunkId = $"{targetCx}_{targetCz}";
 
+                    // 1. Priorität: DB-Check
                     if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
                         continue;
 
-                    if (requestedZombies == 1 && KillCounter.ZombieUrsprung.ContainsValue(chunkId))
+                    // 2. Priorität: Ist für diesen Chunk bereits ein Zombie aktiv?
+                    if (KillCounter.ZombieUrsprung.ContainsValue(chunkId))
                         continue;
 
-                    if (!ChunkSpawnbarkeitCache.TryGetValue(chunkId, out ChunkScanStatus status))
-                        continue;
-
-                    if (status != ChunkScanStatus.Spawntauglich && status != ChunkScanStatus.Spawntauglich_UmgebungFertig)
-                        continue;
+                    // 3. Priorität: RAM-Cache
+                    if (ChunkSpawnbarkeitCache.TryGetValue(chunkId, out ChunkScanStatus status) && (status == ChunkScanStatus.Spawntauglich || status == ChunkScanStatus.Spawntauglich_UmgebungFertigGescannt))
+                        {}
+                    // 4. Priorität: Langzeitgedächtnis (0 = spawntauglich)
+                    else if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills) && kills == 0)
+                    {
+                        // Failsafe: Tragen wir ihn direkt in den RAM nach, falls er dort gefehlt hat
+                        ChunkSpawnbarkeitCache[chunkId] = ChunkScanStatus.Spawntauglich;
+                    }
+                    else { continue;}
 
                     int minX = targetCx * 16;
                     int minZ = targetCz * 16;
@@ -421,7 +453,7 @@ namespace EinmaligerSpawn.ZombieSpawner
 
                     int gespawnteZombies = 0;
 
-                    for (int zombieIdx = 0; zombieIdx < requestedZombies; zombieIdx++)
+                    for (int zombieIdx = 0; zombieIdx < 1; zombieIdx++)
                     {
                         int zombieClassID = EntityClass.FromString("zombieArlene");
                         if (groupList != null)

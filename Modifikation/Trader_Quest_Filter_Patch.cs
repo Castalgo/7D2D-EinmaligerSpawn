@@ -12,6 +12,9 @@ namespace EinmaligerSpawn.Trader
         [HarmonyPostfix]
         public static void Postfix(ref List<PrefabInstance> __result)
         {
+            // Server only. Client rausswerfen
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+
             // Wenn die Liste ohnehin leer ist, müssen wir nichts tun
             if (__result == null || __result.Count == 0) return;
 

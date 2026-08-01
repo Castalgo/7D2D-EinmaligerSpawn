@@ -23,9 +23,11 @@ namespace EinmaligerSpawn.LocalClear
 
         private static float checkTimer = 0f; // Timer zum Drosseln der Update-Frequenz
 
-        // HILFSMETHODE: Berechnet den individuellen Multiplikator für den Spawnschutz
+        // Server only: Berechnet den individuellen Multiplikator für den Spawnschutz
         private static float ErmittleDrosselungsFaktor(EntityPlayer player)
         {
+            // alle Verweise auf diese Methode kommen nur vom Server, daher kein Check nötig
+
             int pid = player.entityId;
 
             if (!playerProtectionLost.ContainsKey(pid))
@@ -59,13 +61,14 @@ namespace EinmaligerSpawn.LocalClear
             return 12f; // Voller Schutz
         }
 
+        // Server only: Wird in jedem GameUpdate aufgerufen, um die Spielerposition zu tracken
         public static void OnGameUpdate()
         {
             // Abbruch, wenn das Feature über die Config deaktiviert wurde
             if (!ModEinstellungen.LokalerChunkClearAktiv)
                 return;
 
-            // Abbruch, wenn wir nicht auf dem Server sind (Client-Only)
+            // Abbruch, wenn wir nicht der Server sind (nur der Server darf die Logik ausführen)
             if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 return;
 
@@ -118,8 +121,11 @@ namespace EinmaligerSpawn.LocalClear
             }
         }
 
+        // Server only: Prüft, ob der Chunk gesäubert werden kann, und markiert ihn als gesäubert
         private static bool PruefeUndSaeubere(string chunkId, EntityPlayer player)
         {
+            // alle Verweise auf diese Methode kommen nur vom Server, daher kein Check nötig
+
             if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
                 return false;
 
@@ -177,13 +183,21 @@ namespace EinmaligerSpawn.LocalClear
 
         public static void Reset()
         {
-            spielerTracking.Clear();
-            playerProtectionLost.Clear(); // NEU: Muss bei Welt-Neustart geleert werden
+            // alle Verweise auf diese Methode kommen nur vom Server, daher kein Check nötig
+            spielerTracking.Clear(); // Positionen der Spieler vergessen
+            playerProtectionLost.Clear(); // muss bei Welt-Neustart geleert werden
         }
 
-        public static void Diagnose(EntityPlayerLocal player)
+        public static void Diagnose(EntityPlayer player)
         {
-            // 1. Feature deaktiviert?
+            // 1.) Bist du überhaupt der Host?
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Diagnose abgebrochen: Dieser Befehl steht nur dem Host der Sitzung zur Verfügung.");
+                return;
+            }
+
+            // 2. Feature deaktiviert?
             if (!ModEinstellungen.LokalerChunkClearAktiv)
             {
                 Log.Warning("[EinmaligerSpawn] Diagnose: 'localclear' ist in der Config deaktiviert (OFF).");
@@ -195,32 +209,17 @@ namespace EinmaligerSpawn.LocalClear
             int cz = pos.z >> 4;
             string chunkId = $"{cx}_{cz}";
 
-            // 2. Chunk bereits clear?
+            // 3. Chunk bereits clear?
             if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
             {
                 int kills = KillCounter.ToteZombiesProChunk[chunkId];
-                Log.Out($"[EinmaligerSpawn] Diagnose: Dieser Chunk ({chunkId}) ist bereits als gesäubert markiert! Registrierte Kills hier: {kills}");
+                Log.Out($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Dieser Chunk ({chunkId}) ist bereits als gesäubert markiert! Registrierte Kills hier: {kills}");
 
-                // NEU: Karten-Update für den aktuellen Chunk und die 8 Nachbarn erzwingen
+                // Karten-Update erzwingen
                 if (ModEinstellungen.KartenOverlayAktiv)
                 {
-                    int geupdateteChunks = 0;
-
-                    for (int x = -1; x <= 1; x++)
-                    {
-                        for (int z = -1; z <= 1; z++)
-                        {
-                            string neighborChunkId = $"{cx + x}_{cz + z}";
-
-                            // Sicherheitscheck: Nur Nachbarn zeichnen, die auch wirklich clear sind
-                            if (KillCounter.ToteZombiesProChunk.ContainsKey(neighborChunkId) && KillCounter.ToteZombiesProChunk[neighborChunkId] >= 1)
-                            {
-                                KartenOverlay.ErzwingeRedraw();
-                                geupdateteChunks++;
-                            }
-                        }
-                    }
-                    Log.Out($"[EinmaligerSpawn] Diagnose: Karten-Overlay für {geupdateteChunks} gesäuberte(n) Chunk(s) im direkten Umfeld (3x3 Raster) wurde synchronisiert.");
+                   KartenOverlay.ErzwingeRedraw();
+                   Log.Out($"[EinmaligerSpawn] Diagnose: Karten-Overlay war möglicherweise asynchron.");
                 }
 
                 return;
@@ -239,21 +238,21 @@ namespace EinmaligerSpawn.LocalClear
                     bool istBlockierer = false;
                     EntityAlive enemyAlive = ent as EntityAlive;
 
-                    // 3. Ursprungs-Chunk aktiv?
+                    // 4. Ursprungs-Chunk aktiv?
                     if (KillCounter.ZombieUrsprung.TryGetValue(ent.entityId, out string uChunk) && uChunk == chunkId)
                     {
                         ursprungGefunden = true;
                         istBlockierer = true;
                     }
 
-                    // 4. Spieler im Kampf?
+                    // 5. Spieler im Kampf?
                     if (enemyAlive != null && enemyAlive.GetAttackTarget() == player)
                     {
                         angreiferGefunden = true;
                         istBlockierer = true;
                     }
 
-                    // 5. Zombie physisch im Chunk?
+                    // 6. Zombie physisch im Chunk?
                     Vector3i entPos = ent.GetBlockPosition();
                     string entChunk = $"{entPos.x >> 4}_{entPos.z >> 4}";
                     if (entChunk == chunkId)
@@ -269,18 +268,18 @@ namespace EinmaligerSpawn.LocalClear
                 }
             }
 
-            // 6. Blockierer auswerten und markieren
+            // 7. Blockierer auswerten und markieren
             if (blockierendeZombies.Count > 0)
             {
                 string grund = "";
-                if (angreiferGefunden) grund += "- Du bist im Kampf (Wirst anvisiert)\n";
-                if (bewohnerGefunden) grund += "- Mindestens ein Feind hält sich in deinem Chunk auf\n";
+                if (angreiferGefunden) grund += $"- Der Spieler ({player.EntityName}) ist im Kampf (Wird anvisiert)\n";
+                if (bewohnerGefunden) grund += "- Mindestens ein Feind hält sich im Chunk auf\n";
                 if (ursprungGefunden) grund += "- Ein Zombie, der zu diesem Chunk gehört, lebt noch\n";
 
-                Log.Warning($"[EinmaligerSpawn] Diagnose für {chunkId} fehlgeschlagen!\nGründe:\n{grund}");
+                Log.Warning($"[EinmaligerSpawn] Diagnose für {player.EntityName} in {chunkId} fehlgeschlagen!\nGründe:\n{grund}");
                 Log.Warning($"[EinmaligerSpawn] Setze temporäre Radar-Marker auf {blockierendeZombies.Count} störende Feind(e)...");
 
-                // Das Radar-Icon holen (wie bei es where)
+                // Das Radar-Icon holen (wie bei "es where")
                 string magicClassName = "supply_drop";
                 if (NavObjectClass.NavObjectClassList != null)
                 {
@@ -303,9 +302,7 @@ namespace EinmaligerSpawn.LocalClear
                 return;
             }
 
-            // 7. Timer-Prüfung (Wenn keine Zombies stören, liegt es an der Zeit)
-
-            // NEU: Wir müssen in der Diagnose die korrekte, skalierte Zeit berechnen
+            // 8. Timer-Prüfung (Wenn keine Zombies stören, liegt es an der Zeit)
             float drosselungsFaktor = ErmittleDrosselungsFaktor(player);
             float benoetigteZeit = 4f * drosselungsFaktor;
 
@@ -313,11 +310,11 @@ namespace EinmaligerSpawn.LocalClear
             {
                 if (daten.ChunkId == chunkId)
                 {
-                    Log.Out($"[EinmaligerSpawn] Diagnose: Alles ruhig! Dein Timer steht aktuell bei: {daten.ZeitImChunk:0.0} / {benoetigteZeit:0.0} Sekunden.");
+                    Log.Out($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Alles ruhig! Der Timer steht aktuell bei: {daten.ZeitImChunk:0.0} / {benoetigteZeit:0.0} Sekunden.");
                 }
                 else
                 {
-                    Log.Out($"[EinmaligerSpawn] Diagnose: Alles ruhig! Du hast diesen Chunk aber gerade erst betreten. (0.0 / {benoetigteZeit:0.0} Sekunden).");
+                    Log.Out($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Alles ruhig! Der Spieler hat diesen Chunk aber gerade erst betreten. (0.0 / {benoetigteZeit:0.0} Sekunden).");
                 }
             }
         }

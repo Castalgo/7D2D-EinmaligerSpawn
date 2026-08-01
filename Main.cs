@@ -1,6 +1,6 @@
 ﻿using System.Reflection;
+using EinmaligerSpawn.HUD;
 using EinmaligerSpawn.LocalClear;
-using EinmaligerSpawn.LootBagMarker;
 using EinmaligerSpawn.Network;
 using EinmaligerSpawn.ZombieSpawner;
 using HarmonyLib;
@@ -24,7 +24,8 @@ namespace EinmaligerSpawn
             {
                 AutoSpawner.OnGameUpdate();
                 LokalenChunkSaeubern.OnGameUpdate();
-                LootbagMarkerManager.OnGameUpdate();
+                FortschrittsBuff.OnGameUpdate();
+                // KartenOverlay wird im SpeichernLaden_Patch.cs beim Welt betreten aufgerufen
             });
 
             Log.Out("[EinmaligerSpawn] Alle Patches erfolgreich geladen!");

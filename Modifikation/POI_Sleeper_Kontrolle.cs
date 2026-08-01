@@ -10,9 +10,9 @@ namespace EinmaligerSpawn.SpawnBlocker
         [HarmonyPrefix]
         public static bool Prefix()
         {
-            // Verhindert, dass das Spiel ein gesäubertes Gebäude (SleeperVolume) 
-            // nach Ablauf des Respawn-Timers wieder zurücksetzt.
+            // Verhindert, dass das Spiel ein gesäubertes Gebäude (SleeperVolume) nach Ablauf des Respawn-Timers wieder zurücksetzt.
             // Das Gebäude bleibt dauerhaft leer.
+            // Methode darf von Server und Client aufgerufen werden, weil sie außer alles ablehnen nichts tut.
             return false;
         }
     }

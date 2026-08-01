@@ -5,7 +5,6 @@ using UnityEngine;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.LocalClear;
-using EinmaligerSpawn.LootBagMarker;
 using EinmaligerSpawn.ZombieSpawner;
 
 namespace EinmaligerSpawn.Commands
@@ -16,20 +15,18 @@ namespace EinmaligerSpawn.Commands
         // Die zentrale Variable für den Hilfetext (Konstante)
         // -----------------------------------------------------------------
         private const string HilfeText =
-    "=== User Befehle ===\n" +
-    "Nutze 'es map <on/off/reload>' für das Overlay.\n" +
-    "Nutze 'es range [x]' um dir anzeigen zu lassen, wie viele Chunks in deiner Umgebung noch spawnen dürfen.\n" +
-    "Nutze 'es msg <on/off>' für globale Chat-Nachrichten.\n" +
-    "Nutze 'es where' um den nähesten aktiven Zombie zu finden.\n" +
-    "Nutze 'es progressbuff <on/off>' um einen Buff anzeigen zu lassen, der deinen lokalen Säuberungs-Fortschritt anzeigt.\n" +
-    "Nutze 'es localclear reason' um herauszufinden, warum der Chunk nicht gesäubert ist.\n" +
-    "Nutze 'es cheat_lootbagmarker <on/off>' um Radar-Marker auf LootBags setzen zu lassen." +
-    "=== Einmaliger Spawn Admin-Befehle ===\n" +
-    "Nutze 'es limit <Zahl>' um das max. Autospawn-Limit zu setzen.\n" +
-    "Nutze 'es timer <Sekunden>' um das Autospawn-Intervall zu ändern.\n" +
-    "Nutze 'es localclear <on/off>' für den autom. 4s-Clear beim Durchlaufen.\n" +
-    "Nutze 'es tactical <on/off>' für den Bonus-Clear.\n" +
-    "Nutze 'es cheat_clear [radius] [reset]' um Chunks im Umkreis auf gecleart zu setzen oder zu löschen.";
+    "=== Client / User Befehle ===\n" +
+    "Nutze 'es map <on/off/reload>' um das persönliche Karten-Overlay zu steuern oder Marker neu zu laden.\n" +
+    "Nutze 'es progressbuff <on/off/time <sek>/radius <m>>' um den HUD-Fortschritt zu steuern, das Intervall oder den Suchradius anzupassen.\n" +
+    "Nutze 'es range [radius] [name]' ODER 'es range [radius] [chunkX] [chunkZ]' um den Säuberungsfortschritt im Umkreis (Standard 120m) zu prüfen.\n" +
+    "Nutze 'es where' als Universal-Radar, um den nähesten aktiven Zombie zu markieren.\n" +
+    "\n=== Server / Admin Befehle ===\n" +
+    "Nutze 'es cheat_clear [radius] [reset]' um Chunks im Umkreis auf 'gesäubert' zu setzen oder den Status zu löschen (Reset).\n" +
+    "Nutze 'es limit <Zahl>' um das globale Autospawn-Limit für Zombies auf dem Server festzulegen.\n" +
+    "Nutze 'es localclear <on/off/reason [name]>' für den autom. 4s-Clear (on/off) oder zur Fehlerdiagnose bei einem Spieler (reason).\n" +
+    "Nutze 'es msg <on/off>' um die globalen Chat-Nachrichten der Mod für alle ein- oder auszuschalten.\n" +
+    "Nutze 'es tactical <on/off>' um den serverseitigen Bonus-Clear (Taktischer Kill) ein- oder auszuschalten.\n" +
+    "Nutze 'es timer <Sekunden>' um das serverseitige Autospawn-Überprüfungsintervall anzupassen.";
 
         public override string[] getCommands()
         {
@@ -38,13 +35,14 @@ namespace EinmaligerSpawn.Commands
 
         public override string getDescription()
         {
-            return HilfeText;
+            return "Steuert die Einstellungen und Werkzeuge der 'EinmaligerSpawn'-Mod. Nutze 'es help' zur Übersicht aller Commands.";
         }
 
         public override void Execute(List<string> _params, CommandSenderInfo _senderInfo)
         {
+            // Wir holen uns den lokalen Spieler (auf einem Dedicated Server ist dieser einfach null).
+            // WICHTIG: Hier kein 'if (player == null) return;' mehr, sonst sperren wir den Server aus!
             EntityPlayerLocal player = GameManager.Instance.World.GetPrimaryPlayer();
-            if (player == null) return;
 
             if (_params.Count == 0)
             {
@@ -58,10 +56,7 @@ namespace EinmaligerSpawn.Commands
             switch (subCommand)
             {
                 case "cheat_clear":
-                    CmdCheatClear(player, _params);
-                    break;
-                case "cheat_lootbagmarker":
-                    CmdCheatLootbagMarker(_params);
+                    CmdCheatClear(_params, _senderInfo);
                     break;
                 case "limit":
                     CmdLimit(_params);
@@ -105,6 +100,11 @@ namespace EinmaligerSpawn.Commands
             Log.Out(HilfeText);
         }
 
+        public override string getHelp()
+        {
+            return HilfeText;
+        }
+
         // =================================================================
         // HELPER METHODEN (Alphabetisch sortiert)
         // =================================================================
@@ -112,8 +112,38 @@ namespace EinmaligerSpawn.Commands
         // -----------------------------------------------------------------
         // BEFEHL: es cheat_clear [radius] [reset]
         // -----------------------------------------------------------------
-        private void CmdCheatClear(EntityPlayerLocal player, List<string> _params)
+        // Dieser Befehl ändert die Server-Datenbank (KillCounter). 
+        private void CmdCheatClear(List<string> _params, CommandSenderInfo _senderInfo)
         {
+            
+            // 1. Server only. Client rauswerfen.
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Admin-Befehl kann nur vom Server oder Host ausgeführt werden.");
+                return;
+            }
+
+            // 2. ZIEL-SPIELER ERMITTELN (Wer hat den Befehl gesendet?)
+            EntityPlayer targetPlayer = null;
+
+            if (_senderInfo.RemoteClientInfo != null)
+            {
+                // Ein Remote-Admin (Mitspieler) hat den Befehl gesendet
+                int entityId = _senderInfo.RemoteClientInfo.entityId;
+                GameManager.Instance.World.Players.dict.TryGetValue(entityId, out targetPlayer);
+            }
+            else
+            {
+                // Der Host selbst (oder der Server über die Konsole) hat den Befehl gesendet
+                targetPlayer = GameManager.Instance.World.GetPrimaryPlayer();
+            }
+
+            if (targetPlayer == null)
+            {
+                Log.Warning("[EinmaligerSpawn] Befehl fehlgeschlagen: Konnte die Position des ausführenden Spielers nicht ermitteln.");
+                return;
+            }
+
             int radiusMeter = 20;
             bool isReset = false;
 
@@ -135,7 +165,7 @@ namespace EinmaligerSpawn.Commands
                 }
             }
 
-            Vector3i playerPos = player.GetBlockPosition();
+            Vector3i playerPos = targetPlayer.GetBlockPosition();
             int px = playerPos.x;
             int pz = playerPos.z;
 
@@ -168,14 +198,11 @@ namespace EinmaligerSpawn.Commands
                         if (isReset)
                         {
                             // --- RESET LOGIK ---
-                            // Chunk aus dem KillCounter löschen
                             if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
                             {
                                 KillCounter.ToteZombiesProChunk.Remove(chunkId);
                                 newlyModified++;
                             }
-
-                            // Chunk aus dem AutoSpawner-Cache werfen, damit er neu gescannt werden kann
                             AutoSpawner.RemoveChunkFromCache(chunkId);
                         }
                         else
@@ -184,57 +211,22 @@ namespace EinmaligerSpawn.Commands
                             if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
                             {
                                 KillCounter.ToteZombiesProChunk[chunkId] = 0;
-                                newlyModified++;
                             }
                             KillCounter.ToteZombiesProChunk[chunkId]++;
+                            newlyModified++;
+
+                            // Netzwerk-Sync: Wir informieren alle Clients, dass dieser Chunk jetzt neu ausgerottet ist
+                            SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new EinmaligerSpawn.Network.NetPackageChunkSync(chunkId));
                         }
                     }
                 }
             }
 
-            // Konsolen-Feedback dynamisch anpassen
             string actionText = isReset ? "reaktiviert (Reset)" : "neu ausgerottet (Clear)";
             string modeText = isReset ? "RESET" : "CLEAR";
 
             Log.Out($"=== Cheat Clear ({radiusMeter}m) - Modus: {modeText} ===");
             Log.Warning($"[ES Spawner] Ich habe {totalChecked} Chunks geprüft und {newlyModified} {actionText}.");
-
-            // Erzwingt ein Neuzeichnen der Overlay-Karte, falls sie aktiv ist
-            if (ModEinstellungen.KartenOverlayAktiv)
-            {
-                KartenOverlay.ErzwingeRedraw();
-            }
-        }
-
-        // -----------------------------------------------------------------
-        // BEFEHL: es cheat_lootbagmarker <on / off>
-        // -----------------------------------------------------------------
-        private void CmdCheatLootbagMarker(List<string> _params)
-        {
-            // Da LootbagMarkerManager im neuen Namespace liegt, sprechen wir ihn direkt voll qualifiziert an 
-            // (oder du fügst oben "using EinmaligerSpawn.LootBagMarker;" hinzu)
-            string currentStatus = EinmaligerSpawn.LootBagMarker.LootbagMarkerManager.IstAktiv ? "ON" : "OFF";
-
-            if (_params.Count < 2)
-            {
-                Log.Warning($"Aktueller Status (Lootbag-Marker): {currentStatus}. Bitte nutze 'es cheat_lootbagmarker on' oder 'es cheat_lootbagmarker off'.");
-                return;
-            }
-
-            string state = _params[1].ToLower();
-
-            if (state == "on" || state == "true")
-            {
-                EinmaligerSpawn.LootBagMarker.LootbagMarkerManager.SetzeModus(true);
-            }
-            else if (state == "off" || state == "false")
-            {
-                EinmaligerSpawn.LootBagMarker.LootbagMarkerManager.SetzeModus(false);
-            }
-            else
-            {
-                Log.Warning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es cheat_lootbagmarker on' oder 'es cheat_lootbagmarker off'.");
-            }
         }
 
         // -----------------------------------------------------------------
@@ -242,6 +234,13 @@ namespace EinmaligerSpawn.Commands
         // -----------------------------------------------------------------
         private void CmdLimit(List<string> _params)
         {
+            // SICHERHEITS-CHECK: Nur der Server darf globale Spielregeln ändern
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Admin-Befehl kann nur vom Server oder Host ausgeführt werden.");
+                return;
+            }
+
             if (_params.Count < 2 || !int.TryParse(_params[1], out int neuesLimit))
             {
                 Log.Warning($"Aktuelles Limit: {ModEinstellungen.GlobalesZombieLimit}. Bitte nutze 'es limit <Zahl>', z.B. 'es limit 18'.");
@@ -255,32 +254,65 @@ namespace EinmaligerSpawn.Commands
         }
 
         // -----------------------------------------------------------------
-        // BEFEHL: es localclear / es walkclear <on / off / reason>
+        // BEFEHL: es localclear / es walkclear <on / off / reason [player]>
         // -----------------------------------------------------------------
         private void CmdLocalClear(List<string> _params)
         {
+            // Server only. Client rauswerfen.
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Admin-Befehl kann nur vom Server oder Host ausgeführt werden.");
+                return;
+            }
+
             string currentStatus = ModEinstellungen.LokalerChunkClearAktiv ? "ON" : "OFF";
 
             if (_params.Count < 2)
             {
-               Log.Warning($"Aktueller Status (localclear): {currentStatus}. Bitte nutze 'es localclear on', 'off' oder 'reason'.");
+                Log.Warning($"Aktueller Status (localclear): {currentStatus}. Bitte nutze 'es localclear on', 'off', 'reason' oder 'reason <spielername>'.");
                 return;
             }
 
             string state = _params[1].ToLower();
 
-            // NEUER PARAMETER: reason / grund
+            // PARAMETER: reason / grund (optional mit Spielername)
             if (state == "reason" || state == "grund")
             {
-                EntityPlayerLocal player = GameManager.Instance.World.GetPrimaryPlayer();
-                if (player != null)
+                EntityPlayer targetPlayer = null;
+
+                // Wurde ein Spielername als 3. Parameter übergeben?
+                if (_params.Count >= 3)
                 {
-                    LokalenChunkSaeubern.Diagnose(player);
+                    string searchName = _params[2].ToLower();
+                    foreach (EntityPlayer p in GameManager.Instance.World.Players.list)
+                    {
+                        if (p.EntityName.ToLower().Contains(searchName))
+                        {
+                            targetPlayer = p;
+                            break;
+                        }
+                    }
+
+                    if (targetPlayer == null)
+                    {
+                        Log.Warning($"[EinmaligerSpawn] Spieler '{_params[2]}' nicht gefunden. Überprüfe die Schreibweise.");
+                        return;
+                    }
+                }
+                else
+                {
+                    // Kein Name angegeben -> Wir nehmen den Host selbst
+                    targetPlayer = GameManager.Instance.World.GetPrimaryPlayer();
+                }
+
+                if (targetPlayer != null)
+                {
+                    Log.Out($"[EinmaligerSpawn] Starte Diagnose für Spieler: {targetPlayer.EntityName}");
+                    LokalenChunkSaeubern.Diagnose(targetPlayer);
                 }
                 return;
             }
 
-            // Bestehende ON / OFF Logik
             if (state == "on" || state == "true")
             {
                 ModEinstellungen.LokalerChunkClearAktiv = true;
@@ -300,10 +332,17 @@ namespace EinmaligerSpawn.Commands
         }
 
         // -----------------------------------------------------------------
-        // BEFEHL: es map (on / off / reload)
+        // BEFEHL: es map <on / off / reload>
         // -----------------------------------------------------------------
         private void CmdMap(List<string> _params)
         {
+            // Ein Dedicated Server hat kein eigenes HUD: rauswerfen.
+            if (GameManager.IsDedicatedServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Befehl steuert ein lokales UI-Element und ist auf einem reinen Dedicated Server wirkungslos.");
+                return;
+            }
+
             if (_params.Count < 2)
             {
                 Log.Out("Bitte nutze 'es map on', 'es map off' oder 'es map reload'.");
@@ -315,21 +354,17 @@ namespace EinmaligerSpawn.Commands
             if (state == "on" || state == "true")
             {
                 KartenOverlay.SetzeModus(true);
-                GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1,
-                    $"[EinmaligerSpawn] Eroberungs-Karte (Overlay) ist nun [00FF00]AKTIVIERT[-].",
-                    null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                Log.Out("[EinmaligerSpawn] Deine persönliche Eroberungs-Karte (Overlay) ist nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 KartenOverlay.SetzeModus(false);
-                GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1,
-                    $"[EinmaligerSpawn] Eroberungs-Karte (Overlay) ist nun [FF0000]DEAKTIVIERT[-].",
-                    null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                Log.Out("[EinmaligerSpawn] Deine persönliche Eroberungs-Karte (Overlay) ist nun DEAKTIVIERT.");
             }
             else if (state == "reload")
             {
                 KartenOverlay.Reload();
-                Log.Out("[EinmaligerSpawn] Karte (Marker) wurde erfolgreich neu geladen.");
+                Log.Out("[EinmaligerSpawn] Deine Karte (Marker) wurde erfolgreich neu geladen.");
             }
             else
             {
@@ -338,10 +373,17 @@ namespace EinmaligerSpawn.Commands
         }
 
         // -----------------------------------------------------------------
-        // BEFEHL: es msg / es message [on / off]
+        // BEFEHL: es msg / es message <on / off>
         // -----------------------------------------------------------------
         private void CmdMsg(List<string> _params)
         {
+            // Server only. Client rauswerfen.
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Admin-Befehl kann nur vom Server oder Host ausgeführt werden.");
+                return;
+            }
+
             string currentStatus = ModEinstellungen.ChatNachrichtenAktiv ? "ON" : "OFF";
 
             if (_params.Count < 2)
@@ -356,13 +398,13 @@ namespace EinmaligerSpawn.Commands
             {
                 ModEinstellungen.ChatNachrichtenAktiv = true;
                 ModEinstellungen.Speichern();
-                Log.Out("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun AKTIVIERT.");
+                Log.Warning("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 ModEinstellungen.ChatNachrichtenAktiv = false;
                 ModEinstellungen.Speichern();
-                Log.Out("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun DEAKTIVIERT.");
+                Log.Warning("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun DEAKTIVIERT.");
             }
             else
             {
@@ -371,15 +413,24 @@ namespace EinmaligerSpawn.Commands
         }
 
         // -----------------------------------------------------------------
-        // BEFEHL: es progressbuff <on / off>
+        // BEFEHL: es progressbuff <on / off / time <sek> / radius <meter>>
         // -----------------------------------------------------------------
         private void CmdProgressBuff(EntityPlayerLocal player, List<string> _params)
         {
+            // SICHERHEITS-CHECK: Ein Dedicated Server hat kein lokales HUD
+            if (GameManager.IsDedicatedServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Befehl steuert ein lokales UI-Element und ist auf einem Dedicated Server wirkungslos.");
+                return;
+            }
+
             string currentStatus = ModEinstellungen.ZeigeLokalenFortschritt ? "ON" : "OFF";
+            float currentTimer = ModEinstellungen.BuffUpdateIntervall;
+            int currentRadius = ModEinstellungen.ProgressBuffRadius;
 
             if (_params.Count < 2)
             {
-                Log.Warning($"Aktueller Status (progressbuff): {currentStatus}. Bitte nutze 'es progressbuff on' oder 'es progressbuff off'.");
+                Log.Warning($"Status: {currentStatus} | Update: {currentTimer}s | Radius: {currentRadius}m. Bitte nutze 'es progressbuff <on/off/time [sek]/radius [meter]>'.");
                 return;
             }
 
@@ -391,7 +442,6 @@ namespace EinmaligerSpawn.Commands
                 ModEinstellungen.Speichern();
                 Log.Out("[EinmaligerSpawn] Lokaler Fortschritts-Buff ist nun AKTIVIERT.");
 
-                // Sofortiges Feedback im HUD erzwingen
                 if (player != null && !player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
                 {
                     player.Buffs.AddBuff("buffEinmaligerSpawnProgress");
@@ -403,35 +453,165 @@ namespace EinmaligerSpawn.Commands
                 ModEinstellungen.Speichern();
                 Log.Out("[EinmaligerSpawn] Lokaler Fortschritts-Buff ist nun DEAKTIVIERT.");
 
-                // Sofortiges Entfernen aus dem HUD erzwingen
                 if (player != null && player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
                 {
                     player.Buffs.RemoveBuff("buffEinmaligerSpawnProgress");
                 }
             }
+            else if (state == "time" || state == "timer")
+            {
+                if (_params.Count >= 3 && float.TryParse(_params[2].Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out float neuerTimer))
+                {
+                    neuerTimer = Mathf.Clamp(neuerTimer, 0.1f, 10f);
+                    ModEinstellungen.BuffUpdateIntervall = neuerTimer;
+                    ModEinstellungen.Speichern();
+                    Log.Out($"[EinmaligerSpawn] Das Update-Intervall für den Fortschritts-Buff wurde auf {neuerTimer} Sekunden gesetzt.");
+                }
+                else
+                {
+                    Log.Warning("Bitte gib eine gültige Zahl für das Intervall an, z.B. 'es progressbuff time 2.5'.");
+                }
+            }
+            else if (state == "radius")
+            {
+                if (_params.Count >= 3 && int.TryParse(_params[2], out int neuerRadius))
+                {
+                    // Begrenzen wir den Radius auf sinnvolle Werte, damit die Engine nicht einfriert
+                    neuerRadius = Mathf.Clamp(neuerRadius, 16, 1000);
+                    ModEinstellungen.ProgressBuffRadius = neuerRadius;
+                    ModEinstellungen.Speichern();
+                    Log.Out($"[EinmaligerSpawn] Der Suchradius für den Fortschritts-Buff wurde auf {neuerRadius} Meter gesetzt.");
+                }
+                else
+                {
+                    Log.Warning("Bitte gib eine gültige Zahl für den Radius an, z.B. 'es progressbuff radius 150'.");
+                }
+            }
             else
             {
-                Log.Warning($"Ungültiger Parameter. Aktueller Status: {currentStatus}. Bitte nutze 'es progressbuff on' oder 'es progressbuff off'.");
+                // Fallback: Wenn der Nutzer nur eine Zahl eintippt (alte Logik für das Intervall)
+                if (float.TryParse(state.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out float fallbackTimer))
+                {
+                    fallbackTimer = Mathf.Clamp(fallbackTimer, 0.1f, 10f);
+                    ModEinstellungen.BuffUpdateIntervall = fallbackTimer;
+                    ModEinstellungen.Speichern();
+                    Log.Out($"[EinmaligerSpawn] Das Update-Intervall für den Fortschritts-Buff wurde auf {fallbackTimer} Sekunden gesetzt.");
+                }
+                else
+                {
+                    Log.Warning("Ungültiger Parameter. Bitte nutze 'es progressbuff <on/off/time [sek]/radius [meter]>'.");
+                }
             }
         }
 
         // -----------------------------------------------------------------
-        // BEFEHL: es range
+        // BEFEHL: es range [radius] [spielername] ODER es range [radius] [chunkX] [chunkZ]
         // -----------------------------------------------------------------
-        private void CmdRange(EntityPlayerLocal player, List<string> _params)
+        private void CmdRange(EntityPlayerLocal localPlayer, List<string> _params)
         {
-            int radiusMeter = 120;
-
-            if (_params.Count > 1)
+            if (GameManager.IsDedicatedServer)
             {
-                int.TryParse(_params[1], out radiusMeter);
+                Log.Warning("[EinmaligerSpawn] Dieser Befehl ist auf einem Dedicated Server wirkungslos.");
+                return;
             }
 
-            // Wir holen uns die Werte sauber aus der neuen zentralen Methode
-            var ergebnis = KillCounter.BerechneLokalenFortschritt(player, radiusMeter);
+            int radiusMeter = 120;
+            EntityPlayer targetPlayer = localPlayer;
+            string searchName = null;
 
-            Log.Out($"=== Spawn-Radar ({radiusMeter}m) ===");
-            Log.Out($"Status: {ergebnis.gesperrt}/{ergebnis.gesamt} ({ergebnis.prozent}%)");
+            bool useChunkCoords = false;
+            int targetChunkX = 0;
+            int targetChunkZ = 0;
+
+            // --- Parameter intelligent auswerten ---
+            if (_params.Count == 2)
+            {
+                if (int.TryParse(_params[1], out int parsedRadius))
+                    radiusMeter = parsedRadius;
+                else
+                    searchName = _params[1].ToLower();
+            }
+            else if (_params.Count == 3)
+            {
+                bool isParam1Int = int.TryParse(_params[1], out int val1);
+                bool isParam2Int = int.TryParse(_params[2], out int val2);
+
+                if (isParam1Int && isParam2Int)
+                {
+                    useChunkCoords = true;
+                    targetChunkX = val1;
+                    targetChunkZ = val2;
+                }
+                else if (isParam1Int && !isParam2Int)
+                {
+                    radiusMeter = val1;
+                    searchName = _params[2].ToLower();
+                }
+                else
+                {
+                    Log.Warning("[EinmaligerSpawn] Ungültige Parameter. Nutzung: 'es range [radius] [name]' oder 'es range [chunkX] [chunkZ]'.");
+                    return;
+                }
+            }
+            else if (_params.Count >= 4)
+            {
+                if (int.TryParse(_params[1], out int r) && int.TryParse(_params[2], out int cx) && int.TryParse(_params[3], out int cz))
+                {
+                    radiusMeter = r;
+                    useChunkCoords = true;
+                    targetChunkX = cx;
+                    targetChunkZ = cz;
+                }
+                else
+                {
+                    Log.Warning("[EinmaligerSpawn] Ungültige Parameter. Nutzung: 'es range [radius] [chunkX] [chunkZ]'.");
+                    return;
+                }
+            }
+
+            // --- FALL 1: Direkte Chunk-Koordinaten ---
+            if (useChunkCoords)
+            {
+                var ergebnisChunk = KillCounter.BerechneLokalenFortschritt(targetChunkX, targetChunkZ, radiusMeter);
+                Log.Out($"=== Spawn-Radar ({radiusMeter}m) für Chunk [{targetChunkX}, {targetChunkZ}] ===");
+                Log.Out($"Status: {ergebnisChunk.gesperrt}/{ergebnisChunk.gesamt} ({ergebnisChunk.prozent}%)");
+                return;
+            }
+
+            // --- FALL 2: Spieler wird gesucht ---
+            if (!string.IsNullOrEmpty(searchName))
+            {
+                EntityPlayer foundPlayer = null;
+                foreach (EntityPlayer p in GameManager.Instance.World.Players.list)
+                {
+                    if (p.EntityName.ToLower().Contains(searchName))
+                    {
+                        foundPlayer = p;
+                        break;
+                    }
+                }
+
+                if (foundPlayer != null)
+                {
+                    targetPlayer = foundPlayer;
+                }
+                else
+                {
+                    Log.Warning($"[EinmaligerSpawn] Spieler '{searchName}' befindet sich in einem Chunk, der aktuell für dich nicht geladen ist (oder der Name ist falsch). Nähere dich, damit der Bereich geladen wird.");
+                    return;
+                }
+            }
+
+            // --- Normale Berechnung für den ermittelten Spieler ---
+            // Spieler-Koordinaten in Chunk-Koordinaten umrechnen
+            Vector3i pos = targetPlayer.GetBlockPosition();
+            int pChunkX = pos.x >> 4;
+            int pChunkZ = pos.z >> 4;
+
+            var ergebnisSpieler = KillCounter.BerechneLokalenFortschritt(pChunkX, pChunkZ, radiusMeter);
+
+            Log.Out($"=== Spawn-Radar ({radiusMeter}m) für {targetPlayer.EntityName} ===");
+            Log.Out($"Status: {ergebnisSpieler.gesperrt}/{ergebnisSpieler.gesamt} ({ergebnisSpieler.prozent}%)");
         }
 
         // -----------------------------------------------------------------
@@ -439,6 +619,13 @@ namespace EinmaligerSpawn.Commands
         // -----------------------------------------------------------------
         private void CmdTactical(List<string> _params)
         {
+            // Server only. Client rauswerfen.
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Admin-Befehl kann nur vom Server oder Host ausgeführt werden.");
+                return;
+            }
+
             string currentStatus = ModEinstellungen.TaktischerKillAktiv ? "ON" : "OFF";
 
             if (_params.Count < 2)
@@ -472,6 +659,13 @@ namespace EinmaligerSpawn.Commands
         // -----------------------------------------------------------------
         private void CmdTimer(List<string> _params)
         {
+            // Server only. Client rauswerfen.
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Admin-Befehl kann nur vom Server oder Host ausgeführt werden.");
+                return;
+            }
+
             if (_params.Count < 2 || !float.TryParse(_params[1], out float neuerTimer))
             {
                 Log.Warning($"Aktueller Timer: {ModEinstellungen.SpawnCheckIntervall} Sekunden. Bitte nutze 'es timer <Sekunden>', z.B. 'es timer 15'.");
@@ -489,6 +683,19 @@ namespace EinmaligerSpawn.Commands
         // -----------------------------------------------------------------
         private void CmdWhere(EntityPlayerLocal player)
         {
+            // Ein Dedicated Server ist kein player: rauswerfen
+            if (GameManager.IsDedicatedServer)
+            {
+                Log.Warning("[EinmaligerSpawn] Dieser Befehl steuert ein lokales UI-Element und ist auf einem reinen Dedicated Server wirkungslos.");
+                return;
+            }
+
+            if (player == null)
+            {
+                Log.Warning("[EinmaligerSpawn] Es hat noch kein Spieler in die Welt geladen.");
+                return;
+            }
+
             float closestDist = float.MaxValue;
             Entity closestEnemy = null;
 

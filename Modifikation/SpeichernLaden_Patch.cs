@@ -3,7 +3,6 @@ using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config; 
 using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.LocalClear;
-using EinmaligerSpawn.LootBagMarker;
 using EinmaligerSpawn.Network;
 using EinmaligerSpawn.ZombieSpawner;
 using HarmonyLib;
@@ -20,7 +19,11 @@ namespace EinmaligerSpawn.SaveLoadPatches
             string savePath = GameIO.GetSaveGameDir();
             if (!string.IsNullOrEmpty(savePath))
             {
-                KillCounter.Save(savePath);
+                // nur der Server speichert die Kill-Datenbank
+                if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                {
+                    KillCounter.Save(savePath);
+                }
 
                 // Einstellungen für dieses Savegame speichern
                 ModEinstellungen.Speichern();
@@ -38,37 +41,14 @@ namespace EinmaligerSpawn.SaveLoadPatches
             string savePath = GameIO.GetSaveGameDir();
             if (!string.IsNullOrEmpty(savePath))
             {
-                KillCounter.Load(savePath);
+                // nur der Server lädt die Kill-Datenbank
+                if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                {
+                    KillCounter.Load(savePath);
+                }
 
                 // Einstellungen für diese Welt laden
                 ModEinstellungen.Laden(savePath);                
-            }
-        }
-    }
-
-    // Patch für das dynamische Überschreiben der Spawns
-    [HarmonyPatch(typeof(GameManager), "Update")]
-    public class Patch_GameManager_Update
-    {
-        [HarmonyPostfix]
-        public static void Postfix()
-        {
-            // Prüfen: Haben wir es schon gemacht? Ist die Welt geladen? Ist der Spieler da?
-            if (!DynamischesSpawnLimit.IstInitialisiert &&
-                GameManager.Instance != null &&
-                GameManager.Instance.World != null &&
-                GameManager.Instance.World.Players.dict.Count > 0)
-            {
-                DynamischesSpawnLimit.IstInitialisiert = true; // Sperre aktivieren, damit es nur 1x läuft
-
-                // Limit-Werte (Default 4) neu überschreiben
-                DynamischesSpawnLimit.InitialisiereWerte();
-
-                // Karte basierend auf den gerade geladenen Einstellungen aktualisieren
-                KartenOverlay.Wiederherstellen();
-
-                // LootbagMarker basierend auf den Einstellungen wiederherstellen
-                LootbagMarkerManager.Wiederherstellen();
             }
         }
     }
@@ -82,19 +62,18 @@ namespace EinmaligerSpawn.SaveLoadPatches
         {
             Log.Out("[EinmaligerSpawn] Spiel wird verlassen. Leere den Arbeitsspeicher...");
 
-            // 1. Update-Schleife für die nächste Sitzung wieder freigeben
-            DynamischesSpawnLimit.IstInitialisiert = false;
+            // 1. NUR SERVER
+            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                // 1. Dynamisches Spawn-Limit zurücksetzen 
+                DynamischesSpawnLimit.IstInitialisiert = false;
+                // 2. Autospawner zurücksetzen (RAM Cache der gescannten Chunks)
+                AutoSpawner.Reset();
+                // 3. Spieler-Tracking (4-Sekunden-Clear) zurücksetzen
+                LokalenChunkSaeubern.Reset();
+            }
 
-            //// 2. Autospawner zurücksetzen (damit die Spieler-Tracking-Daten gelöscht werden)
-            AutoSpawner.Reset();
-
-            // 3. Spieler-Tracking (4-Sekunden-Clear) zurücksetzen
-            LokalenChunkSaeubern.Reset();
-
-            // 4. UI-Marker für Lootbags zerstören und das statische Gedächtnis leeren
-            LootbagMarkerManager.EntferneAlleMarker();
-
-            // 5. Temporäres Zombie-Gedächtnis leeren (sicherheitshalber)
+            // 4. Temporäres Zombie-Gedächtnis leeren (sicherheitshalber)
             if (KillCounter.ZombieUrsprung != null)
             {
                 KillCounter.ZombieUrsprung.Clear();
@@ -111,6 +90,46 @@ namespace EinmaligerSpawn.SaveLoadPatches
         [HarmonyPostfix]
         public static void Postfix(ClientInfo _cInfo, RespawnType _respawnReason, Vector3i _pos, int _entityId)
         {
+            // =================================================================
+            // TEIL 1: Einmalige Server-Initialisierung
+            // =================================================================
+            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                if (!DynamischesSpawnLimit.IstInitialisiert)
+                {
+                    DynamischesSpawnLimit.IstInitialisiert = true;
+                    DynamischesSpawnLimit.InitialisiereWerte();
+                    Log.Out("[EinmaligerSpawn] Late-Init: Spawns wurden für die Session initialisiert (Server).");
+                }
+            }
+
+            // =================================================================
+            // TEIL 2: Lokale UI-Aktualisierung (nur für den Spieler am PC)
+            // =================================================================
+            EntityPlayerLocal localPlayer = GameManager.Instance.World.GetPrimaryPlayer();
+
+            // Wir prüfen, ob der Spieler, der gerade gespawnt ist, WIRKLICH der lokale Spieler am PC ist
+            if (localPlayer != null && localPlayer.entityId == _entityId)
+            {
+                // 1. Karte basierend auf der lokalen Config aktualisieren
+                KartenOverlay.Wiederherstellen();
+
+                // 2. Lokalen Buff beim Spawnen aufräumen, falls deaktiviert
+                if (!ModEinstellungen.ZeigeLokalenFortschritt)
+                {
+                    if (localPlayer.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
+                    {
+                        localPlayer.Buffs.RemoveBuff("buffEinmaligerSpawnProgress");
+                    }
+                }
+
+                Log.Out("[EinmaligerSpawn] Late-Init: Kartenoverlay und lokaler Fortschrittsbuff wurden initialisiert.");
+            }
+
+            // =================================================================
+            // TEIL 3: Netzwerk-Sync für beigetretene Clients
+            // =================================================================
+
             // 1. Sicherheitscheck: Nur der Server darf Daten verschicken!
             if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
 
@@ -119,18 +138,25 @@ namespace EinmaligerSpawn.SaveLoadPatches
             if (_cInfo == null) return;
 
             // 3. Wir holen uns alle Chunk-Namen (Keys), die der Server in seinem Gedächtnis hat
-            List<string> alleChunks = new List<string>(KillCounter.ToteZombiesProChunk.Keys);
+            List<string> relevanteChunks = new List<string>();
+            foreach (var kvp in KillCounter.ToteZombiesProChunk)
+            {
+                if (kvp.Value >= 1)
+                {
+                    relevanteChunks.Add(kvp.Key);
+                }
+            }
 
             // 4. Wenn die Welt noch komplett frisch ist, müssen wir nichts schicken
-            if (alleChunks.Count == 0) return;
+            //if (relevanteChunks.Count == 0) return; // auskommentiert, damit die config übertragen wird
 
             // 5. Briefumschlag packen (Phase 1 Konstruktor mit der kompletten Liste)
-            NetPackageChunkSync package = new NetPackageChunkSync(alleChunks);
+            NetPackageChunkSync package = new NetPackageChunkSync(relevanteChunks);
 
             // 6. Das Paket GANZ GEZIELT nur an diesen einen Spieler senden
             _cInfo.SendPackage(package);
 
-            Log.Out($"[EinmaligerSpawn] Netzwerk: Sende komplettes Chunk-Gedächtnis ({alleChunks.Count} Einträge) an Spieler {_cInfo.playerName}...");
+            Log.Out($"[EinmaligerSpawn] Netzwerk: Sende komplettes Chunk-Gedächtnis ({relevanteChunks.Count} Einträge) an Spieler {_cInfo.playerName}...");
         }
     }
 

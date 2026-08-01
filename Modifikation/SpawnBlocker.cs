@@ -10,9 +10,13 @@ namespace EinmaligerSpawn.SpawnBlocker
     [HarmonyPatch(typeof(World), "GetRandomSpawnPositionInAreaMinMaxToPlayers")]
     public class World_GetRandomSpawnPosition_Patch
     {
+        // Server: Wenn der Chunk als Spawnort für einen normalen Zombie gepickt wurde prüfen wir, ob der Chunk bereits "ausgerottet" ist
         [HarmonyPostfix]
         public static void Postfix(ref bool __result, ref Chunk _chunk)
         {
+            // Server-only. Client rauswerfen
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+
             if (__result && _chunk != null)
             {
                 Vector3i chunkPos = _chunk.GetWorldPos();
@@ -30,10 +34,13 @@ namespace EinmaligerSpawn.SpawnBlocker
     [HarmonyPatch(typeof(World), "GetMobRandomSpawnPosWithWater")]
     public class World_GetMobRandomSpawnPosWithWater_Patch
     {
-        // HIER KORRIGIERT: _position statt _pos
+        // Server: Wenn der Chunk als Spawnort für eine Horde gepickt wurde prüfen wir, ob der Chunk bereits "ausgerottet" ist
         [HarmonyPostfix]
         public static void Postfix(ref bool __result, ref Vector3 _position)
         {
+            // Server-only. Client rauswerfen
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+
             if (__result)
             {
                 Vector3i spawnPos = new Vector3i(_position); // <-- HIER AUCH ANGEPASST
@@ -54,9 +61,13 @@ namespace EinmaligerSpawn.SpawnBlocker
     [HarmonyPatch(typeof(World), "SpawnEntityInWorld")]
     public class Universal_ZombieUrsprung_Patch
     {
+        // Server: Wenn ein Zombie gespawnt wird, merken wir uns seinen Ursprungs-Chunk in einem temporären Dictionary
         [HarmonyPostfix]
         public static void Postfix(Entity _entity)
         {
+            // Server-only. Client rauswerfen
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+
             if (_entity != null && (_entity is EntityEnemy || _entity is EntityZombie))
             {
                 // Nur eintragen, wenn der AutoSpawner die ID nicht schon reserviert hat

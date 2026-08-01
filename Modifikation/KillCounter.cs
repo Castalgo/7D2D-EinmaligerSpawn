@@ -23,7 +23,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
             return $"{pos.x >> 4}_{pos.z >> 4}";
         }
 
-        // Zählt einen Kill direkt über die Chunk-ID hoch
+        // Nur Server: Zählt einen Kill direkt über die Chunk-ID hoch
         public static void AddToterZombieNachID(string chunkId, int maxZombies)
         {
             if (!ToteZombiesProChunk.ContainsKey(chunkId))
@@ -59,7 +59,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
             }
         }
 
-        // Verarbeitet die taktischen Kills (Nachbar-Clear oder Gekitet) sauber an einem Ort
+        // Nur Server:Verarbeitet die taktischen Kills (Nachbar-Clear oder Gekitet) sauber an einem Ort
         public static void VerbucheTaktischenKill(string chunkId, bool istNachbar)
         {
             // Sicherheitsprüfung: Falls der Chunk ohnehin schon leer ist, nur hochzählen
@@ -105,7 +105,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
             }
         }
 
-        // Prüft, ob in diesem Chunk noch gespawnt werden darf
+        // Nur Server: Prüft, ob in diesem Chunk noch gespawnt werden darf
         public static bool IstChunkAusgerottet(Vector3i pos, int maxZombies)
         {
             string id = GetChunkId(pos);
@@ -117,6 +117,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
             return false;
         }
 
+        // Nur Server: Lädt die Chunk-Datenbank aus der JSON-Datei
         public static void Load(string saveDir)
         {
             string path = Path.Combine(saveDir, "ausgerotteteChunks.json");
@@ -140,6 +141,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
             }
         }
 
+        // Nur Server: Speichert die Chunk-Datenbank in einer JSON-Datei
         public static void Save(string saveDir)
         {
             try
@@ -160,51 +162,30 @@ namespace EinmaligerSpawn.ChunkDatenbank
             }
         }
 
-        // Berechnet den prozentualen Clear-Status in einem bestimmten Umkreis
-        public static (int gesperrt, int gesamt, int prozent) BerechneLokalenFortschritt(EntityPlayer player, int radiusMeter = 120)
+        // Client: Berechnet den prozentualen Clear-Status in einem bestimmten Umkreis
+        public static (int gesamt, int gesperrt, float prozent) BerechneLokalenFortschritt(int centerChunkX, int centerChunkZ, int radiusMeter)
         {
-            Vector3i playerPos = player.GetBlockPosition();
-            int px = playerPos.x;
-            int pz = playerPos.z;
+            int chunkSuchRadius = UnityEngine.Mathf.CeilToInt((float)radiusMeter / 16f);
 
-            int playerChunkX = px >> 4;
-            int playerChunkZ = pz >> 4;
+            int gesamtChunks = 0;
+            int gesperrteChunks = 0;
 
-            int chunkSuchRadius = Mathf.CeilToInt((float)radiusMeter / 16f);
-            int maxDistSq = radiusMeter * radiusMeter;
-
-            int x_Gesperrt = 0;
-            int y_Gesamt = 0;
-
-            for (int cx = playerChunkX - chunkSuchRadius; cx <= playerChunkX + chunkSuchRadius; cx++)
+            for (int cx = centerChunkX - chunkSuchRadius; cx <= centerChunkX + chunkSuchRadius; cx++)
             {
-                for (int cz = playerChunkZ - chunkSuchRadius; cz <= playerChunkZ + chunkSuchRadius; cz++)
+                for (int cz = centerChunkZ - chunkSuchRadius; cz <= centerChunkZ + chunkSuchRadius; cz++)
                 {
-                    int minX = cx * 16;
-                    int maxX = minX + 15;
-                    int minZ = cz * 16;
-                    int maxZ = minZ + 15;
+                    gesamtChunks++;
+                    string chunkId = $"{cx}_{cz}";
 
-                    int dx = Math.Max(0, Math.Max(minX - px, px - maxX));
-                    int dz = Math.Max(0, Math.Max(minZ - pz, pz - maxZ));
-
-                    if (dx * dx + dz * dz <= maxDistSq)
+                    if (ToteZombiesProChunk.TryGetValue(chunkId, out int kills) && kills > 0)
                     {
-                        y_Gesamt++;
-                        string chunkId = $"{cx}_{cz}";
-
-                        if (ToteZombiesProChunk.ContainsKey(chunkId) && ToteZombiesProChunk[chunkId] >= 1)
-                        {
-                            x_Gesperrt++;
-                        }
+                        gesperrteChunks++;
                     }
                 }
             }
 
-            float prozentFloat = y_Gesamt > 0 ? ((float)x_Gesperrt / y_Gesamt) * 100f : 0f;
-            int prozent = Mathf.RoundToInt(prozentFloat);
-
-            return (x_Gesperrt, y_Gesamt, prozent);
+            float prozent = gesamtChunks > 0 ? (float)Math.Round(((float)gesperrteChunks / gesamtChunks) * 100f, 1) : 0f;
+            return (gesamtChunks, gesperrteChunks, prozent);
         }
     }
 }

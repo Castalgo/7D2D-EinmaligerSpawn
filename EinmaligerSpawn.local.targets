@@ -1,0 +1,34 @@
+<Project>
+
+  <Target Name="CopyToGameFolder" AfterTargets="Build">
+
+    <!-- FAKT: Innerhalb des Targets ist $(TargetDir) garantiert verfügbar. -->
+    <!-- Wir schneiden den Backslash ab, sodass wir zwei völlig saubere Pfade ohne End-Slashes haben. -->
+    <PropertyGroup>
+      <RoboSource>$(TargetDir.TrimEnd('\'))</RoboSource>
+      <RoboDest>D:\Nextcloud\Studium\0. Progammieren\C++\7 Days to Die Mod\EinmaligerSpawn\Mods\EinmaligerSpawn</RoboDest>
+    </PropertyGroup>
+
+    <!-- FAKT: "call" verhindert das Abschneiden von Anführungszeichen durch cmd.exe. -->
+    <Exec IgnoreExitCode="true"
+          Command="call robocopy &quot;$(RoboSource)&quot; &quot;$(RoboDest)&quot; /S /XF *.pdb">
+      <Output TaskParameter="ExitCode" PropertyName="RobocopyExitCode" />
+    </Exec>
+
+    <PropertyGroup>
+      <RobocopyMessage Condition="'$(RobocopyExitCode)' == '2'">Zusätzliche Dateien im Ziel vorhanden.</RobocopyMessage>
+      <RobocopyMessage Condition="'$(RobocopyExitCode)' == '3'">Erfolgreich kopiert, aber zusätzliche Dateien im Ziel.</RobocopyMessage>
+	  <RobocopyMessage Condition="'$(RobocopyExitCode)' == '4'">Unterschiede festgestellt, die nicht durch Kopieren behoben wurden.</RobocopyMessage>
+	  <RobocopyMessage Condition="'$(RobocopyExitCode)' == '5'">Dateien wurden kopiert und zusätzlich wurden nicht behobene Unterschiede festgestellt.</RobocopyMessage>
+	  <RobocopyMessage Condition="'$(RobocopyExitCode)' == '6'">Zusätzliche Dateien vorhanden und Unterschiede festgestellt.</RobocopyMessage>
+	  <RobocopyMessage Condition="'$(RobocopyExitCode)' == '7'">Dateien wurden kopiert, zusätzliche Dateien vorhanden und Unterschiede festgestellt.</RobocopyMessage>
+      <RobocopyMessage Condition="'$(RobocopyExitCode)' == '8'">Ein Verzeichnis oder eine Datei konnte nicht kopiert werden.</RobocopyMessage>
+      <RobocopyMessage Condition="'$(RobocopyExitCode)' &gt;= '16'">Schwerwiegender Robocopy-Fehler.</RobocopyMessage>
+    </PropertyGroup>
+
+    <Error Text="Robocopy Deployment fehlgeschlagen (Code $(RobocopyExitCode)): $(RobocopyMessage)"
+           Condition="'$(RobocopyExitCode)' &gt;= '8'" />
+
+  </Target>
+
+</Project>

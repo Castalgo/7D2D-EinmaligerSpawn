@@ -13,6 +13,13 @@ namespace EinmaligerSpawn.SpawnBlocker
         [HarmonyPrefix]
         public static void Prefix(EntityAlive __instance, out bool __state)
         {
+            // Nur Server. Clienten rauswerfen
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                __state = false; // Dummy-Wert, wird nicht verwendet
+                return;
+            }
+
             // Merken, ob der Zombie VOR diesem Aufruf bereits tot war (!IsAlive bedeutet tot)
             __state = !__instance.IsAlive();
         }
@@ -21,6 +28,9 @@ namespace EinmaligerSpawn.SpawnBlocker
         [HarmonyPostfix]
         public static void Postfix(EntityAlive __instance, bool __state)
         {
+            // Nur Server. Clienten rauswerfen
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+
             // ENGINE-QUIRK FIX: Wenn der Zombie vorher schon tot war -> SOFORT ABBRECHEN!
             // Das verhindert, dass Ragdoll- oder Fallschaden die Belohnungen doppelt triggern.
             if (__state) return;
