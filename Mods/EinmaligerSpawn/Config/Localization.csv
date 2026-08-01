@@ -1,4 +1,0 @@
-Key,Source,Context,Changes,English,Deutsch
-buffEinmaligerSpawnProgressName,buffs,Buff,,,Local Clear (%),Lokaler Fortschritt (%)
-buffEinmaligerSpawnProgressDesc,buffs,Buff,,,Shows the percentage of cleared chunks in your vicinity.,Zeigt an, wie viel Prozent der Chunks in deiner Umgebung gesäubert sind.
-buffEinmaligerSpawnProgressTooltip,buffs,Buff,,,Local Clear (%),Lokaler Fortschritt (%)
