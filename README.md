@@ -20,7 +20,7 @@ The mod includes its own custom AutoSpawner. This was added because the vanilla 
 ---
 
 ## Clear Mechanics (How chunks are cleared)
-You have several ways to mark a chunk as "cleared" in the mod. Almost all of these mechanics can be individually modified or completely disabled, as the settings are saved in the `ModConfig.json` within your savegame folder.
+You have several ways to mark a chunk as "cleared" in the mod. Almost all of these mechanics can be individually modified or completely disabled, as the settings are saved in the `EinmaligerSpawn_Config.json` within your savegame folder.
 
 1.  **Point of Origin (The Default Clear)**
     If you kill a zombie spawned by the mod, the chunk from which this zombie originally spawned is immediately cleared.
@@ -52,19 +52,18 @@ For world generation and the mod to function correctly, the sandbox settings mus
 ---
 
 ## Console Commands
-The mod comes with several custom commands for the in-game console. All commands start with the prefix `es`.
+The mod comes with several custom commands for the in-game console. All commands start with the prefix `es`. Use `es help` in-game for an overview.
 
-### User Commands
-*   `es map <on/off/reload>`: Use this command for the green map overlay.
-*   `es range [x]`: Shows how many chunks in your vicinity are still allowed to spawn zombies.
-*   `es msg <on/off>`: Enables or disables global chat messages (enabled by default).
-*   `es where`: Finds the nearest active zombie.
-*   `es localclear reason`: Explains why the current chunk hasn't been cleared.
-*   `es cheat_lootbagmarker <on/off>`: Places radar markers on LootBags.
+### Client / User Commands (Available to everyone)
+*   `es map <on/off/reload>`: Controls the personal map overlay or reloads markers.
+*   `es progressbuff <on/off/time [sec]/radius [m]>`: Controls the HUD progress buff, updates the interval, or changes the search radius.
+*   `es range [radius] [name]` OR `es range [radius] [chunkX] [chunkZ]`: Checks the clearance progress in the vicinity (default 120m).
+*   `es where`: Universal radar to mark the nearest active zombie on the compass.
 
-### Admin Commands
-*   `es limit <number>`: Sets the maximum AutoSpawn limit.
-*   `es timer <seconds>`: Changes the AutoSpawn interval.
-*   `es localclear <on/off>`: Toggles the automatic 4-second clear when passing through.
-*   `es tactical <on/off>`: Enables or disables the bonus clear (Place of Death).
-*   `es cheat_clear [x]`: Sets chunks within a radius to "cleared".
+### Server / Admin Commands (Host & Server Admins only)
+*   `es cheat_clear [radius] [reset]`: Sets chunks within a radius to 'cleared' or resets their status.
+*   `es limit <number>`: Sets the global AutoSpawn limit for zombies on the server.
+*   `es localclear <on/off/reason [name]>`: Toggles the automatic 4s-clear (on/off) or runs diagnostics for a specific player (reason).
+*   `es msg <on/off>`: Enables or disables the global chat messages of the mod for everyone.
+*   `es tactical <on/off>`: Enables or disables the server-side bonus clear (Place of Death).
+*   `es timer <seconds>`: Adjusts the server-side AutoSpawn check interval.

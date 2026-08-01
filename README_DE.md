@@ -20,7 +20,7 @@ Die Mod beinhaltet einen komplett eigenen AutoSpawner. Dieser wurde hinzugefügt
 ---
 
 ## Die Clear-Mechaniken (Wie Chunks gesäubert werden)
-Du hast verschiedene Möglichkeiten, wie ein Chunk in der Mod als "ausgerottet" markiert wird. Fast alle dieser Mechaniken können individuell modifiziert oder ganz abgeschaltet werden, da die Einstellungen im Spielstand-Ordner in der `ModConfig.json` gespeichert werden.
+Du hast verschiedene Möglichkeiten, wie ein Chunk in der Mod als "ausgerottet" markiert wird. Fast alle dieser Mechaniken können individuell modifiziert oder ganz abgeschaltet werden, da die Einstellungen im Spielstand-Ordner in der `EinmaligerSpawn_Config.json` gespeichert werden.
 
 1.  **Ursprungsort (Der Standard-Clear)**
     Tötest du einen von der Mod gespawnten Zombie, wird sofort der Chunk gesäubert, aus dem dieser Zombie ursprünglich stammte.
@@ -52,19 +52,18 @@ Für die Weltgenerierung und die korrekte Funktion der Mod müssen die Sandbox-E
 ---
 
 ## Konsolenbefehle
-Die Mod bringt eine Reihe eigener Befehle für die Ingame-Konsole mit. Alle Befehle beginnen mit dem Präfix `es`.
+Die Mod bringt eine Reihe eigener Befehle für die Ingame-Konsole mit. Alle Befehle beginnen mit dem Präfix `es`. Nutze `es help` im Spiel für eine Übersicht.
 
-### User-Befehle
-*   `es map <on/off/reload>`: Nutze diesen Befehl für das grüne Karten-Overlay.
-*   `es range [x]`: Um dir anzeigen zu lassen, wie viele Chunks in deiner Umgebung noch spawnen dürfen.
-*   `es msg <on/off>`: Aktiviert oder deaktiviert die globalen Chat-Nachrichten (standardmäßig aktiviert)[cite: 6].
-*   `es where`: Um den nähesten aktiven Zombie zu finden.
-*   `es localclear reason`: Um herauszufinden, warum der Chunk nicht gesäubert ist.
-*   `es cheat_lootbagmarker <on/off>`: Um Radar-Marker auf LootBags setzen zu lassen.
+### Client / User Befehle (Für jeden nutzbar)
+*   `es map <on/off/reload>`: Um das persönliche Karten-Overlay zu steuern oder Marker neu zu laden.
+*   `es progressbuff <on/off/time [sek]/radius [m]>`: Um den HUD-Fortschritt zu steuern, das Intervall oder den Suchradius anzupassen.
+*   `es range [radius] [name]` ODER `es range [radius] [chunkX] [chunkZ]`: Um den Säuberungsfortschritt im Umkreis (Standard 120m) zu prüfen.
+*   `es where`: Als Universal-Radar, um den nähesten aktiven Zombie zu markieren.
 
-### Admin-Befehle
-*   `es limit <Zahl>`: Um das maximale Autospawn-Limit zu setzen.
-*   `es timer <Sekunden>`: Um das Autospawn-Intervall zu ändern.
-*   `es localclear <on/off>`: Schaltet den automatischen 4s-Clear beim Durchlaufen um.
-*   `es tactical <on/off>`: Aktiviert oder deaktiviert den Bonus-Clear (Todesort).
-*   `es cheat_clear [x]`: Um Chunks im Umkreis auf "gecleart" zu setzen.
+### Server / Admin Befehle (Nur für Host & Server-Admins)
+*   `es cheat_clear [radius] [reset]`: Um Chunks im Umkreis auf 'gesäubert' zu setzen oder den Status zu löschen (Reset).
+*   `es limit <Zahl>`: Um das globale Autospawn-Limit für Zombies auf dem Server festzulegen.
+*   `es localclear <on/off/reason [name]>`: Für den autom. 4s-Clear (on/off) oder zur Fehlerdiagnose bei einem Spieler (reason).
+*   `es msg <on/off>`: Um die globalen Chat-Nachrichten der Mod für alle ein- oder auszuschalten.
+*   `es tactical <on/off>`: Um den serverseitigen Bonus-Clear (Taktischer Kill) ein- oder auszuschalten.
+*   `es timer <Sekunden>`: Um das serverseitige Autospawn-Überprüfungsintervall anzupassen.
