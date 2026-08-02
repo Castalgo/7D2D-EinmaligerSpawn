@@ -67,8 +67,23 @@ namespace EinmaligerSpawn.Config
             if (string.IsNullOrEmpty(saveDir)) return;
 
             string configPfad = Path.Combine(saveDir, "EinmaligerSpawn_Config.json");
+
             try
             {
+                // Prüfen und Ordner erstellen
+                if (!Directory.Exists(saveDir))
+                {
+                    Directory.CreateDirectory(saveDir);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.Error($"[EinmaligerSpawn] Fehler beim Finden oder Erstellen des Ordners.: {e.Message}");
+
+                return;
+            }
+
+            try { 
                 var config = new ConfigDaten
                 {
                     // alphabetische Reihenfolge der Eigenschaften
@@ -82,6 +97,7 @@ namespace EinmaligerSpawn.Config
                     TaktischerKillAktiv = TaktischerKillAktiv,
                     ZeigeLokalenFortschritt = ZeigeLokalenFortschritt,
                 };
+
                 string json = JsonConvert.SerializeObject(config, Formatting.Indented);
                 File.WriteAllText(configPfad, json);
             }
