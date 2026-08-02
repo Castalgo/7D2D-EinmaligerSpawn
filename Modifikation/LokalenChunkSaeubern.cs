@@ -175,7 +175,7 @@ namespace EinmaligerSpawn.LocalClear
 
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
-                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
             }
 
             return true;

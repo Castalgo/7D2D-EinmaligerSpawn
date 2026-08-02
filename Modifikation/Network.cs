@@ -10,7 +10,7 @@ namespace EinmaligerSpawn.Network
     {
         private List<string> gesaeuberteChunks = new List<string>();
 
-        // --- NEU: Config-Werte ---
+        // --- Config-Werte ---
         private bool isLoginSync = false;
         private bool chatNachrichtenAktiv;
         private int globalesZombieLimit;
@@ -19,29 +19,31 @@ namespace EinmaligerSpawn.Network
         private bool taktischerKillAktiv;
 
         // 1. Standard-Konstruktor (Zwingend notwendig zum Empfangen)
-        public NetPackageChunkSync()
-        {
-        }
+        public NetPackageChunkSync() { }
 
         // 2. Konstruktor für Phase 1 (Login: Schickt die komplette Liste + Config)
-        public NetPackageChunkSync(List<string> alleChunks)
+        public NetPackageChunkSync SetupForLogin(List<string> alleChunks)
         {
-            this.gesaeuberteChunks = alleChunks;
-            this.isLoginSync = true; // Schalter aktivieren!
+            this.gesaeuberteChunks = new List<string>(alleChunks);
+            this.isLoginSync = true;
 
-            // Aktuelle Server-Werte in das Paket laden
             this.chatNachrichtenAktiv = ModEinstellungen.ChatNachrichtenAktiv;
             this.globalesZombieLimit = ModEinstellungen.GlobalesZombieLimit;
             this.lokalerChunkClearAktiv = ModEinstellungen.LokalerChunkClearAktiv;
             this.spawnCheckIntervall = ModEinstellungen.SpawnCheckIntervall;
             this.taktischerKillAktiv = ModEinstellungen.TaktischerKillAktiv;
+
+            return this;
         }
 
         // 3. Konstruktor für Phase 2 (Live-Update: Schickt nur einen Chunk, KEINE Config)
-        public NetPackageChunkSync(string einzelnerChunk)
+        public NetPackageChunkSync SetupForLive(string einzelnerChunk)
         {
+            this.gesaeuberteChunks.Clear();
             this.gesaeuberteChunks.Add(einzelnerChunk);
-            this.isLoginSync = false; // Schalter bleibt aus
+            this.isLoginSync = false;
+
+            return this;
         }
 
         // =================================================================
@@ -49,12 +51,14 @@ namespace EinmaligerSpawn.Network
         // =================================================================
         public override void write(PooledBinaryWriter _writer)
         {
+            // WICHTIG: Zwingend erforderlich, damit die Engine die ID 
+            // in den Stream schreibt (exakt wie im Vanilla-Code).
+            base.write(_writer);
+
             System.IO.BinaryWriter baseWriter = _writer;
 
-            // 1. Wir schreiben zuerst den Schalter auf den Umschlag
             baseWriter.Write(this.isLoginSync);
 
-            // 2. Wenn es ein Login-Sync ist, schreiben wir die 5 Config-Werte
             if (this.isLoginSync)
             {
                 baseWriter.Write(this.chatNachrichtenAktiv);
@@ -64,7 +68,6 @@ namespace EinmaligerSpawn.Network
                 baseWriter.Write(this.taktischerKillAktiv);
             }
 
-            // 3. Danach schreiben wir wie gewohnt die Chunks
             baseWriter.Write((ushort)gesaeuberteChunks.Count);
             foreach (string chunkId in gesaeuberteChunks)
             {
@@ -77,25 +80,27 @@ namespace EinmaligerSpawn.Network
         // =================================================================
         public override void read(PooledBinaryReader _reader)
         {
-            // 1. Schalter auslesen
-            this.isLoginSync = _reader.ReadBoolean();
+            // WICHTIG: KEIN base.read aufrufen (exakt wie im Vanilla-Code).
+            // Die Engine hat die ID zu diesem Zeitpunkt bereits ausgelesen!
 
-            // 2. Wenn es ein Login-Sync ist, Config-Werte auspacken
+            System.IO.BinaryReader baseReader = _reader;
+
+            this.isLoginSync = baseReader.ReadBoolean();
+
             if (this.isLoginSync)
             {
-                this.chatNachrichtenAktiv = _reader.ReadBoolean();
-                this.globalesZombieLimit = _reader.ReadInt32();
-                this.lokalerChunkClearAktiv = _reader.ReadBoolean();
-                this.spawnCheckIntervall = _reader.ReadSingle();
-                this.taktischerKillAktiv = _reader.ReadBoolean();
+                this.chatNachrichtenAktiv = baseReader.ReadBoolean();
+                this.globalesZombieLimit = baseReader.ReadInt32();
+                this.lokalerChunkClearAktiv = baseReader.ReadBoolean();
+                this.spawnCheckIntervall = baseReader.ReadSingle();
+                this.taktischerKillAktiv = baseReader.ReadBoolean();
             }
 
-            // 3. Chunks auspacken
-            ushort anzahl = _reader.ReadUInt16();
+            ushort anzahl = baseReader.ReadUInt16();
             gesaeuberteChunks.Clear();
             for (int i = 0; i < anzahl; i++)
             {
-                gesaeuberteChunks.Add(_reader.ReadString());
+                gesaeuberteChunks.Add(baseReader.ReadString());
             }
         }
 
@@ -141,7 +146,8 @@ namespace EinmaligerSpawn.Network
         // =================================================================
         public override int GetLength()
         {
-            int length = 1; // 1 Byte für den isLoginSync bool
+            // Die nackte Paketlänge deiner Daten (kein base.GetLength!)
+            int length = 1; // 1 Byte für isLoginSync
 
             if (this.isLoginSync)
             {
@@ -149,7 +155,7 @@ namespace EinmaligerSpawn.Network
                 length += 11;
             }
 
-            // Bestehende Berechnung für Chunks
+            // 2 Bytes für ushort Count + (Anzahl * geschätzte String-Länge)
             length += 2 + (gesaeuberteChunks.Count * 10);
             return length;
         }

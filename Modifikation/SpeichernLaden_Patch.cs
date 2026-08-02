@@ -151,7 +151,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
             //if (relevanteChunks.Count == 0) return; // auskommentiert, damit die config übertragen wird
 
             // 5. Briefumschlag packen (Phase 1 Konstruktor mit der kompletten Liste)
-            NetPackageChunkSync package = new NetPackageChunkSync(relevanteChunks);
+            NetPackageChunkSync package = NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLogin(relevanteChunks);
 
             // 6. Das Paket GANZ GEZIELT nur an diesen einen Spieler senden
             _cInfo.SendPackage(package);

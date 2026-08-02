@@ -7,9 +7,9 @@ using UnityEngine;
 
 namespace EinmaligerSpawn.ZombieSpawner
 {
-    // ==================================================================================
+    // =========================================================================================
     // Chunk-Scan-Status. Sagt NICHTS über die Nachbarn aus, sondern nur über den Chunk selbst.
-    // ==================================================================================
+    // =========================================================================================
     public enum ChunkScanStatus
     {
         Unbekannt = 0,
@@ -298,10 +298,10 @@ namespace EinmaligerSpawn.ZombieSpawner
                 if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
                     KillCounter.ToteZombiesProChunk[chunkId] = 1;
 
-                if (!GameManager.IsDedicatedServer && ModEinstellungen.KartenOverlayAktiv)
-                    KartenOverlay.ErzwingeRedraw();
+                //if (!GameManager.IsDedicatedServer && ModEinstellungen.KartenOverlayAktiv)
+                //  KartenOverlay.ErzwingeRedraw();
 
-                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
 
                 return 54; // Biom ungültig -> Maximalstrafe (simuliert 54 Fehlschläge)
             }
@@ -368,7 +368,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                 if (!GameManager.IsDedicatedServer && ModEinstellungen.KartenOverlayAktiv)
                     KartenOverlay.ErzwingeRedraw();
 
-                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
 
                 return verbrauchteTickets; // Hier sind es die vollen 54 Tickets
             }

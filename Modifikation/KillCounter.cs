@@ -53,7 +53,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
 
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
-                    SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
+                    SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
                 }
 
             }
@@ -80,7 +80,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
 
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
-                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(new NetPackageChunkSync(chunkId));
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
             }
 
             // Chatnachricht und Konsole vorbereiten

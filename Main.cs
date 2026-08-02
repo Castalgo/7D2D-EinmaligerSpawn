@@ -18,6 +18,7 @@ namespace EinmaligerSpawn
             harmony.PatchAll(Assembly.GetExecutingAssembly());
 
             // Dem Spiel unser neues Netzwerk-Paket offiziell bekannt machen
+            //NetPackageManager.RegisterPackage<NetPackageChunkSync>();
 
             // Patch für alle gemoddeten Änderungen, die auf GameUpdate angewiesen sind
             ModEvents.GameUpdate.RegisterHandler((ref ModEvents.SGameUpdateData data) =>
