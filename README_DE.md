@@ -3,6 +3,8 @@
 
 # EinmaligerSpawn (für 7D2D Version 3.x.x)
 
+📌 **[⬇️ Direkt zu den Konsolenbefehlen springen](#konsolenbefehle)**
+
 ## Über diese Mod
 Die Mod registriert, wenn du einen Chunk oder ein POI von Zombies gesäubert hast, und verhindert dauerhaft, dass sie in diesem Chunk respawnen. 
 Aktuell befindet sich das Projekt in der Alpha-Phase (es ist die erste spielbare Alpha-Version) und wurde bisher nur im aktuellen Build getestet.
@@ -12,14 +14,14 @@ Aktuell befindet sich das Projekt in der Alpha-Phase (es ist die erste spielbare
 2. Entpacke die heruntergeladene ZIP-Datei.
 3. Platziere den entpackten Ordner `Mods` in deinem Mod-Verzeichnis unter `%AppData%\7DaysToDie\`.
 
-Die Mod ist rein client seitig und braucht nicht auf dem Server installiert werden. Diese Mod unterstütz kein EAC, d. h. der Server muss EAC abgeschaltet haben.
+**Wichtig für Multiplayer:** Diese Mod kommuniziert über eigene Netzwerkpakete und muss daher **sowohl auf dem Server als auch bei allen Clients** installiert sein. Die Mod unterstützt kein EAC, d. h. der Server muss EAC abgeschaltet haben.
 
 ---
 
 ## Der AutoSpawner
 Die Mod beinhaltet einen komplett eigenen AutoSpawner. Dieser wurde hinzugefügt, da das Vanilla-Spawnsystem des Spiels oft zu langsam und passiv agiert, wenn zu viele Bereiche um einen herum keinen Spawn mehr erlauben. Der Spawner sorgt dafür, dass die Welt um dich herum trotzdem bevölkert ist.
 *   **Standard-Verhalten:** Die Mod prüft standardmäßig alle 5 Sekunden, ob neue Zombies benötigt werden, und hält ein globales Limit von maximal 18 aktiven Zombies aufrecht.
-*   **Anpassbarkeit:** Du kannst diese Werte jederzeit im Spiel über die Konsolenbefehle `es timer <Sekunden>` und `es limit <Zahl>` an deine Vorlieben oder Serverleistung anpassen.
+*   **Anpassbarkeit:** Du kannst diese Werte jederzeit im Spiel über die Konsolenbefehle `esa timer <Sekunden>` und `esa limit <Zahl>` an deine Vorlieben oder Serverleistung anpassen.
 
 ---
 
@@ -31,11 +33,11 @@ Du hast verschiedene Möglichkeiten, wie ein Chunk in der Mod als "ausgerottet" 
 2.  **Todesort (Taktischer Kill / Kiting)**
     Zusätzlich zum Ursprungsort belohnt dich die Mod, wenn du taktisch spielst. Ziehst (kitest) du einen Zombie in einen anderen, angrenzenden Chunk und tötest ihn dort, wird auch dieser Todesort-Chunk mitgesäubert. 
     *   *Standard:* Diese Funktion ist standardmäßig aktiviert (`TaktischerKillAktiv = true`). 
-    *   *Steuerung:* Du kannst den Taktik-Clear über die Konsole mit `es tactical <on/off>` jederzeit umschalten.
+    *   *Steuerung:* Du kannst den Taktik-Clear über die Konsole mit `esa tactical <on/off>` jederzeit umschalten.
 3.  **Durchlaufen (Lokaler Chunk Clear)**
     Du musst nicht jeden Chunk freikämpfen. Wenn du dich einfach nur 4 Sekunden lang ununterbrochen in einem Chunk aufhältst, gilt dieser ebenfalls als gesichert.
     *   *Standard:* Diese Funktion ist standardmäßig eingeschaltet (`LokalerChunkClearAktiv = true`).
-    *   *Steuerung:* Möchtest du das Spiel härter machen, deaktiviere diese Mechanik über die Konsole mit `es localclear <on/off>`.
+    *   *Steuerung:* Möchtest du das Spiel härter machen, deaktiviere diese Mechanik über die Konsole mit `esa localclear <on/off>`.
 
 ---
 
@@ -55,22 +57,25 @@ Für die Weltgenerierung und die korrekte Funktion der Mod müssen die Sandbox-E
 
 ---
 
+<a id="konsolenbefehle"></a>
 ## Konsolenbefehle
-Die Mod bringt eine Reihe eigener Befehle für die Ingame-Konsole mit. Alle Befehle beginnen mit dem Präfix `es`. Nutze `es help` im Spiel für eine Übersicht.
+Die Mod bringt eine Reihe eigener Befehle für die Ingame-Konsole mit. Alle lokalen Spieler-Befehle beginnen mit dem Präfix `es`, alle Server-Befehle mit `esa`. Nutze `es help` oder `esa help` im Spiel für eine Übersicht.
 
-### Client / User Befehle (Für jeden nutzbar)
+### Client / User Befehle (Für jeden lokal nutzbar)
 *   `es map <on/off/reload>`: Um das persönliche Karten-Overlay zu steuern oder Marker neu zu laden.
+*   `es msg <on/off>`: Um deine lokalen Chat-Nachrichten der Mod ein- oder auszuschalten.
 *   `es progressbuff <on/off/time [sek]/radius [m]>`: Um den HUD-Fortschritt zu steuern, das Intervall oder den Suchradius anzupassen.
 *   `es range [radius] [name]` ODER `es range [radius] [chunkX] [chunkZ]`: Um den Säuberungsfortschritt im Umkreis (Standard 120m) zu prüfen.
 *   `es where`: Als Universal-Radar, um den nähesten aktiven Zombie zu markieren.
 
 ### Server / Admin Befehle (Nur für Host & Server-Admins)
-*   `es cheat_clear [radius] [reset]`: Um Chunks im Umkreis auf 'gesäubert' zu setzen oder den Status zu löschen (Reset).
-*   `es limit <Zahl>`: Um das globale Autospawn-Limit für Zombies auf dem Server festzulegen.
-*   `es localclear <on/off/reason [name]>`: Für den autom. 4s-Clear (on/off) oder zur Fehlerdiagnose bei einem Spieler (reason).
-*   `es msg <on/off>`: Um die globalen Chat-Nachrichten der Mod für alle ein- oder auszuschalten.
-*   `es tactical <on/off>`: Um den serverseitigen Bonus-Clear (Taktischer Kill) ein- oder auszuschalten.
-*   `es timer <Sekunden>`: Um das serverseitige Autospawn-Überprüfungsintervall anzupassen.
+*   `esa cheat_clear [Spieler] [radius] [reset]`: Um Chunks im Umkreis auf 'gesäubert' zu setzen oder den Status zu löschen (Reset).
+*   `esa cheat_loud [Spieler/Coords] [Räume]`: Zwingt das nächste POI (max. 80m), seine schlafenden Zombies zu wecken und auf den Spieler zu hetzen.
+*   `esa limit <Zahl>`: Um das globale Autospawn-Limit für Zombies auf dem Server festzulegen.
+*   `esa localclear <on/off/reason [name]>`: Für den autom. 4s-Clear (on/off) oder zur Fehlerdiagnose bei einem Spieler (reason).
+*   `esa range [Spieler] [radius]`: Um als Admin den geclearten Bereich um einen beliebigen Spieler zu berechnen.
+*   `esa tactical <on/off>`: Um den serverseitigen Bonus-Clear (Taktischer Kill) ein- oder auszuschalten.
+*   `esa timer <Sekunden>`: Um das serverseitige Autospawn-Überprüfungsintervall anzupassen.
 
 ---
-This mod uses Harmony by Andreas Pardeike, licensed under the MIT License. Many thanks for his work.
+This mod requires Harmony by Andreas Pardeike. Many thanks for his great work!

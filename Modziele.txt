@@ -27,5 +27,5 @@ Ziele der Mod EinmaligerSpawn (Version 3.x.x)
 Idee für zukünftige Erweiterung
 ----------------------------------------------------------------
 - "easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen
-- Chat-Spam im Multiplayer: Statt globaler Server-Chat-Nachrichten (GameManager.Instance.ChatMessageServer) könnte man die Meldungen für den Walkthrough-Clear oder den taktischen Kill als lokale UI-Benachrichtigungen (Toast-Messages am Bildschirmrand) oder als System-Meldungen implementieren, die nur derjenige Spieler sieht, der den Chunk auch tatsächlich gesäubert hat.
-- Kill XP-Faktor einbauen
+- Kill XP-Faktor einbauen???
+- Readme.md updaten

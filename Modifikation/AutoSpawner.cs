@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
-using EinmaligerSpawn.KartenOverlayManager;
+//using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.Network;
 using UnityEngine;
 
@@ -365,8 +365,8 @@ namespace EinmaligerSpawn.ZombieSpawner
                 if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
                     KillCounter.ToteZombiesProChunk[chunkId] = 1;
 
-                if (!GameManager.IsDedicatedServer && ModEinstellungen.KartenOverlayAktiv)
-                    KartenOverlay.ErzwingeRedraw();
+                //if (!GameManager.IsDedicatedServer && ModEinstellungen.KartenOverlayAktiv)
+                  //  KartenOverlay.ErzwingeRedraw();
 
                 SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
 

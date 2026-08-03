@@ -5,7 +5,6 @@ using Newtonsoft.Json;
 using UnityEngine;
 using System.Linq;
 using EinmaligerSpawn.Config;
-using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.Network;
 
 namespace EinmaligerSpawn.ChunkDatenbank
@@ -40,26 +39,16 @@ namespace EinmaligerSpawn.ChunkDatenbank
             {
                 Log.Warning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
 
-                // Holt die aktuelle In-Game-Zeit (z.B. Tag 4, 14:35)
-                ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
-                string feedbackMsg = $"[00FF00][{timeString}] Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet.[-]";
-                GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
-
-                if (KartenOverlay.IstAktiv)
-                {
-                    KartenOverlay.ErzwingeRedraw();
-                }
+                // CHAT ENTFERNT: Der Client wertet das nun lokal aus.
 
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
                     SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
                 }
-
             }
         }
 
-        // Nur Server:Verarbeitet die taktischen Kills (Nachbar-Clear oder Gekitet) sauber an einem Ort
+        // Nur Server: Verarbeitet die taktischen Kills (Nachbar-Clear oder Gekitet) sauber an einem Ort
         public static void VerbucheTaktischenKill(string chunkId, bool istNachbar)
         {
             // Sicherheitsprüfung: Falls der Chunk ohnehin schon leer ist, nur hochzählen
@@ -72,36 +61,19 @@ namespace EinmaligerSpawn.ChunkDatenbank
             // Chunk auf gesäubert setzen
             ToteZombiesProChunk[chunkId] = 1;
 
-            // Live-Update für die Karte auslösen
-            if (KartenOverlay.IstAktiv)
-            {
-                KartenOverlay.ErzwingeRedraw();
-            }
-
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
                 SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
             }
 
-            // Chatnachricht und Konsole vorbereiten
-            ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-            string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
-            string feedbackMsg;
-
+            // CHAT ENTFERNT: Nur noch Server-Logs behalten
             if (istNachbar)
             {
                 Log.Warning($"[EinmaligerSpawn] Taktischer Bonus: Nachbar {chunkId} zusätzlich gesichert!");
-                feedbackMsg = $"[00FF00][{timeString}] Flächensäuberungsbonus: Angrenzendes Gebiet {chunkId} clear.[-]";
             }
             else
             {
                 Log.Warning($"[EinmaligerSpawn] Taktischer Clear! Todes-Chunk {chunkId} wurde gesichert.");
-                feedbackMsg = $"[00FF00][{timeString}] Taktische Säuberung: Gebiet {chunkId} clear.[-]";
-            }
-
-            if (ModEinstellungen.ChatNachrichtenAktiv) // nur wenn die Chatnachrichten aktiviert sind, wird die Nachricht gesendet
-            {
-                GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
             }
         }
 
@@ -125,7 +97,6 @@ namespace EinmaligerSpawn.ChunkDatenbank
             {
                 try
                 {
-                    // Lese die JSON-Datei aus und befülle das Dictionary
                     string json = File.ReadAllText(path);
                     ToteZombiesProChunk = JsonConvert.DeserializeObject<Dictionary<string, int>>(json) ?? new Dictionary<string, int>();
                     Log.Out($"[EinmaligerSpawn] {ToteZombiesProChunk.Count} Chunk-Daten erfolgreich geladen.");

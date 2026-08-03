@@ -1,7 +1,9 @@
 ﻿using System.Collections.Generic;
+using System;
 using EinmaligerSpawn.ChunkDatenbank;
-using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.Config;
+using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.PoiTracker;
 using UnityEngine;
 
 namespace EinmaligerSpawn.Network
@@ -12,22 +14,18 @@ namespace EinmaligerSpawn.Network
 
         // --- Config-Werte ---
         private bool isLoginSync = false;
-        private bool chatNachrichtenAktiv;
         private int globalesZombieLimit;
         private bool lokalerChunkClearAktiv;
         private float spawnCheckIntervall;
         private bool taktischerKillAktiv;
 
-        // 1. Standard-Konstruktor (Zwingend notwendig zum Empfangen)
         public NetPackageChunkSync() { }
 
-        // 2. Konstruktor für Phase 1 (Login: Schickt die komplette Liste + Config)
         public NetPackageChunkSync SetupForLogin(List<string> alleChunks)
         {
             this.gesaeuberteChunks = new List<string>(alleChunks);
             this.isLoginSync = true;
 
-            this.chatNachrichtenAktiv = ModEinstellungen.ChatNachrichtenAktiv;
             this.globalesZombieLimit = ModEinstellungen.GlobalesZombieLimit;
             this.lokalerChunkClearAktiv = ModEinstellungen.LokalerChunkClearAktiv;
             this.spawnCheckIntervall = ModEinstellungen.SpawnCheckIntervall;
@@ -36,7 +34,6 @@ namespace EinmaligerSpawn.Network
             return this;
         }
 
-        // 3. Konstruktor für Phase 2 (Live-Update: Schickt nur einen Chunk, KEINE Config)
         public NetPackageChunkSync SetupForLive(string einzelnerChunk)
         {
             this.gesaeuberteChunks.Clear();
@@ -46,13 +43,8 @@ namespace EinmaligerSpawn.Network
             return this;
         }
 
-        // =================================================================
-        // SCHREIBEN (Der Server packt den Briefumschlag)
-        // =================================================================
         public override void write(PooledBinaryWriter _writer)
         {
-            // WICHTIG: Zwingend erforderlich, damit die Engine die ID 
-            // in den Stream schreibt (exakt wie im Vanilla-Code).
             base.write(_writer);
 
             System.IO.BinaryWriter baseWriter = _writer;
@@ -61,7 +53,6 @@ namespace EinmaligerSpawn.Network
 
             if (this.isLoginSync)
             {
-                baseWriter.Write(this.chatNachrichtenAktiv);
                 baseWriter.Write(this.globalesZombieLimit);
                 baseWriter.Write(this.lokalerChunkClearAktiv);
                 baseWriter.Write(this.spawnCheckIntervall);
@@ -75,21 +66,14 @@ namespace EinmaligerSpawn.Network
             }
         }
 
-        // =================================================================
-        // LESEN (Der Client öffnet den Briefumschlag)
-        // =================================================================
         public override void read(PooledBinaryReader _reader)
         {
-            // WICHTIG: KEIN base.read aufrufen (exakt wie im Vanilla-Code).
-            // Die Engine hat die ID zu diesem Zeitpunkt bereits ausgelesen!
-
             System.IO.BinaryReader baseReader = _reader;
 
             this.isLoginSync = baseReader.ReadBoolean();
 
             if (this.isLoginSync)
             {
-                this.chatNachrichtenAktiv = baseReader.ReadBoolean();
                 this.globalesZombieLimit = baseReader.ReadInt32();
                 this.lokalerChunkClearAktiv = baseReader.ReadBoolean();
                 this.spawnCheckIntervall = baseReader.ReadSingle();
@@ -104,18 +88,13 @@ namespace EinmaligerSpawn.Network
             }
         }
 
-        // =================================================================
-        // VERARBEITEN (Was der Client tun soll)
-        // =================================================================
         public override void ProcessPackage(World _world, GameManager _callbacks)
         {
             if (_world == null) return;
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
 
-            // --- TEIL 1: Config übernehmen (Nur beim Login) ---
             if (this.isLoginSync)
             {
-                ModEinstellungen.ChatNachrichtenAktiv = this.chatNachrichtenAktiv;
                 ModEinstellungen.GlobalesZombieLimit = this.globalesZombieLimit;
                 ModEinstellungen.LokalerChunkClearAktiv = this.lokalerChunkClearAktiv;
                 ModEinstellungen.SpawnCheckIntervall = this.spawnCheckIntervall;
@@ -124,7 +103,6 @@ namespace EinmaligerSpawn.Network
                 Log.Out("[EinmaligerSpawn] Netzwerk: Die Server-Regeln (Config) wurden erfolgreich empfangen und übernommen.");
             }
 
-            // --- TEIL 2: Chunks übernehmen (Immer) ---
             bool datenGeaendert = false;
             foreach (string chunkId in gesaeuberteChunks)
             {
@@ -132,6 +110,16 @@ namespace EinmaligerSpawn.Network
                 {
                     KillCounter.ToteZombiesProChunk[chunkId] = 1;
                     datenGeaendert = true;
+
+                    // LOKALE CHAT-NACHRICHT FÜR DEN SPIELER
+                    if (!this.isLoginSync && ModEinstellungen.ChatNachrichtenAktiv)
+                    {
+                        ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                        string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+                        string feedbackMsg = $"[00FF00][{timeString}] Gebiet {chunkId} wurde dauerhaft gesäubert![-]";
+
+                        GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                    }
                 }
             }
 
@@ -141,23 +129,111 @@ namespace EinmaligerSpawn.Network
             }
         }
 
-        // =================================================================
-        // LÄNGE (Paketgröße berechnen)
-        // =================================================================
         public override int GetLength()
         {
-            // Die nackte Paketlänge deiner Daten (kein base.GetLength!)
-            int length = 1; // 1 Byte für isLoginSync
+            int length = 1;
 
             if (this.isLoginSync)
             {
-                // 3x bool (3) + 1x int (4) + 1x float (4) = 11 Bytes
-                length += 11;
+                length += 10;
             }
 
-            // 2 Bytes für ushort Count + (Anzahl * geschätzte String-Länge)
             length += 2 + (gesaeuberteChunks.Count * 10);
             return length;
+        }
+    }
+
+    public class NetPackagePoiSync : NetPackage
+    {
+        private List<int> gesaeubertePOIs = new List<int>();
+        private bool isLoginSync = false;
+
+        public NetPackagePoiSync() { }
+
+        public NetPackagePoiSync SetupForLogin(List<int> allePois)
+        {
+            this.gesaeubertePOIs = new List<int>(allePois);
+            this.isLoginSync = true;
+            return this;
+        }
+
+        public NetPackagePoiSync SetupForLive(int einzelnerPoi)
+        {
+            this.gesaeubertePOIs.Clear();
+            this.gesaeubertePOIs.Add(einzelnerPoi);
+            this.isLoginSync = false;
+            return this;
+        }
+
+        public override void write(PooledBinaryWriter _writer)
+        {
+            base.write(_writer);
+            System.IO.BinaryWriter baseWriter = _writer;
+            baseWriter.Write(this.isLoginSync);
+
+            baseWriter.Write((ushort)gesaeubertePOIs.Count);
+            foreach (int poiId in gesaeubertePOIs)
+            {
+                baseWriter.Write(poiId);
+            }
+        }
+
+        public override void read(PooledBinaryReader _reader)
+        {
+            System.IO.BinaryReader baseReader = _reader;
+
+            this.isLoginSync = baseReader.ReadBoolean();
+
+            ushort anzahl = baseReader.ReadUInt16();
+            gesaeubertePOIs.Clear();
+            for (int i = 0; i < anzahl; i++)
+            {
+                gesaeubertePOIs.Add(baseReader.ReadInt32());
+            }
+        }
+
+        public override void ProcessPackage(World _world, GameManager _callbacks)
+        {
+            if (_world == null) return;
+
+            foreach (int poiId in gesaeubertePOIs)
+            {
+                bool warSchonGecleart = PoiDatenbank.IstGecleart(poiId);
+
+                if (!warSchonGecleart)
+                {
+                    PoiDatenbank.SetzeGecleart(poiId);
+
+                    // LOKALE CHAT-NACHRICHT FÜR DEN SPIELER
+                    if (!this.isLoginSync && !GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                    {
+                        string poiName = "Unbekannt";
+                        PrefabInstance poi = GameManager.Instance.GetDynamicPrefabDecorator()?.GetPrefab(poiId);
+                        if (poi != null)
+                        {
+                            poiName = poi.name;
+                        }
+
+                        ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                        string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+                        string feedbackMsg = $"[00FF00][{timeString}] POI '{poiName}' wurde restlos gesäubert![-]";
+
+                        GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                    }
+                }
+            }
+
+            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer && !this.isLoginSync)
+            {
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(
+                    NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(gesaeubertePOIs[0])
+                );
+            }
+        }
+
+        public override int GetLength()
+        {
+            return 1 + 2 + (gesaeubertePOIs.Count * 4);
         }
     }
 }

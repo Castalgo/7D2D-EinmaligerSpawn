@@ -84,6 +84,7 @@
     <Compile Include="Main.cs" />
     <Compile Include="Modifikation\FortschrittsBuff.cs" />
     <Compile Include="Modifikation\Network.cs" />
+    <Compile Include="Modifikation\POI_Tracker.cs" />
     <Compile Include="Modifikation\SpawnBlocker.cs" />
     <Compile Include="Modifikation\KillCounter.cs" />
     <Compile Include="Modifikation\KartenOverlay.cs" />
@@ -106,6 +107,9 @@
     <None Include="Config\Localization.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Content Include="Config\nav_objects.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Config\quests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

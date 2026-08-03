@@ -1,6 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
+using EinmaligerSpawn.Network;
+using EinmaligerSpawn.PoiTracker;
 using HarmonyLib;
 using UnityEngine;
 
@@ -35,12 +39,26 @@ namespace EinmaligerSpawn.SpawnBlocker
             // Das verhindert, dass Ragdoll- oder Fallschaden die Belohnungen doppelt triggern.
             if (__state) return;
 
-            // Abbruch, wenn der taktische Kill in der Config deaktiviert ist
-            if (!ModEinstellungen.TaktischerKillAktiv) return;
-
             // Prüfen: Ist es überhaupt ein Zombie? (Egal ob Biom, POI oder geladen)
             if (__instance is EntityEnemy || __instance is EntityZombie)
             {
+                // =========================================================
+                // TEIL 1: POI-CLEAR PRÜFUNG (Neu mit Verzögerung)
+                // =========================================================
+                PrefabInstance poi = GameManager.Instance.World.GetPOIAtPosition(__instance.position);
+                if (poi != null && poi.sleeperVolumes != null && poi.sleeperVolumes.Count > 0)
+                {
+                    // Startet die Prüfung losgelöst vom aktuellen Frame
+                    GameManager.Instance.StartCoroutine(CheckPoiDelayed(poi));
+                }
+
+                // =========================================================
+                // TEIL 2: CHUNK-CLEAR PRÜFUNG (Dein bisheriger Code)
+                // =========================================================
+
+                // Abbruch, wenn der taktische Kill in der Config deaktiviert ist
+                if (!ModEinstellungen.TaktischerKillAktiv) return;
+
                 // 1. Chunk-Koordinaten des Todesortes berechnen
                 Vector3 todesPos = __instance.position;
                 int tCx = Utils.Fastfloor(todesPos.x / 16f);
@@ -138,7 +156,7 @@ namespace EinmaligerSpawn.SpawnBlocker
 
                         if (!hatAktiveFeinde)
                         {
-                            // Die Datenbank übernimmt jetzt das Speichern, die Map und den Chat
+                            // Die Datenbank übernimmt jetzt das Speichern und die Map
                             KillCounter.VerbucheTaktischenKill(nachbarId, true);
 
                             return; // Nachbar belohnt -> Fertig!
@@ -157,7 +175,7 @@ namespace EinmaligerSpawn.SpawnBlocker
                     // ---------------------------------------------------------
                     if (!KillCounter.ToteZombiesProChunk.ContainsKey(todesChunkId) || KillCounter.ToteZombiesProChunk[todesChunkId] < 1)
                     {
-                        // Die Datenbank übernimmt das Setzen auf 1, Map-Update und den Chat
+                        // Die Datenbank übernimmt das Setzen auf 1 und das Map-Update
                         KillCounter.VerbucheTaktischenKill(todesChunkId, false);
                     }
                     else
@@ -165,6 +183,39 @@ namespace EinmaligerSpawn.SpawnBlocker
                         // Chunk war ohnehin schon clear -> Er bekommt einfach den Bonus-Kill addiert
                         KillCounter.ToteZombiesProChunk[todesChunkId]++;
                     }
+                }
+            }
+        }
+
+        // Die ausgelagerte asynchrone Prüfung
+        private static IEnumerator CheckPoiDelayed(PrefabInstance poi)
+        {
+            // Gibt der Engine 1 Sekunde Zeit, um den Tod des Zombies zu verarbeiten und das Flag zu setzen
+            yield return new WaitForSeconds(1.0f);
+
+            // Abbruch, falls das Gebäude in der Zwischenzeit durch einen anderen Kill-Thread bereits gesichert wurde
+            if (PoiDatenbank.IstGecleart(poi.id)) yield break;
+
+            bool istKomplettLeer = true;
+            foreach (SleeperVolume volumen in poi.sleeperVolumes)
+            {
+                if (!volumen.wasCleared)
+                {
+                    istKomplettLeer = false;
+                    break;
+                }
+            }
+
+            if (istKomplettLeer)
+            {
+                PoiDatenbank.SetzeGecleart(poi.id);
+                Log.Out($"[EinmaligerSpawn] POI '{poi.name}' (ID: {poi.id}) wurde restlos gesäubert!");
+
+                // CHAT ENTFERNT: Die Auswertung passiert nun lokal über das Netzwerk-Paket.
+
+                if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                {
+                    SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id));
                 }
             }
         }

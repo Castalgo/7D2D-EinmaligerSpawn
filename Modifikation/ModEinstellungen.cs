@@ -10,16 +10,19 @@ namespace EinmaligerSpawn.Config
         public static float BuffUpdateIntervall = 2f;
         public static bool ChatNachrichtenAktiv = true;
         public static int GlobalesZombieLimit = 18;
-        public static bool KartenOverlayAktiv = true; 
+        public static bool KartenOverlayAktiv = true;
         public static bool LokalerChunkClearAktiv = true;
         public static int ProgressBuffRadius = 120;
         public static float SpawnCheckIntervall = 5f;
         public static bool TaktischerKillAktiv = true;
         public static bool ZeigeLokalenFortschritt = true;
-        
 
         public static void Laden(string saveDir)
         {
+            // Prüft zuverlässig und völlig unabhängig von anwesenden Spielern, 
+            // ob dies ein reiner Dedicated Server (ohne UI) ist.
+            bool isDedicated = GameManager.IsDedicatedServer;
+
             string configPfad = Path.Combine(saveDir, "EinmaligerSpawn_Config.json");
             if (File.Exists(configPfad))
             {
@@ -30,15 +33,16 @@ namespace EinmaligerSpawn.Config
                     if (config != null)
                     {
                         BuffUpdateIntervall = config.BuffUpdateIntervall;
-                        ChatNachrichtenAktiv = config.ChatNachrichtenAktiv;
                         GlobalesZombieLimit = config.GlobalesZombieLimit;
-                        KartenOverlayAktiv = config.KartenOverlayAktiv;
                         LokalerChunkClearAktiv = config.LokalerChunkClearAktiv;
                         ProgressBuffRadius = config.ProgressBuffRadius;
                         SpawnCheckIntervall = config.SpawnCheckIntervall;
                         TaktischerKillAktiv = config.TaktischerKillAktiv;
-                        ZeigeLokalenFortschritt = config.ZeigeLokalenFortschritt;
 
+                        // Optische Features & UI werden bei reinen Servern immer zwangsweise deaktiviert
+                        ChatNachrichtenAktiv = isDedicated ? false : config.ChatNachrichtenAktiv;
+                        KartenOverlayAktiv = isDedicated ? false : config.KartenOverlayAktiv;
+                        ZeigeLokalenFortschritt = isDedicated ? false : config.ZeigeLokalenFortschritt;
                     }
                 }
                 catch (Exception e)
@@ -50,14 +54,16 @@ namespace EinmaligerSpawn.Config
             {
                 // Standardwerte, falls noch keine Config existiert
                 BuffUpdateIntervall = 2f;
-                ChatNachrichtenAktiv = true;
                 GlobalesZombieLimit = 18;
-                KartenOverlayAktiv = true; 
                 LokalerChunkClearAktiv = true;
                 ProgressBuffRadius = 120;
                 SpawnCheckIntervall = 5f;
                 TaktischerKillAktiv = true;
-                ZeigeLokalenFortschritt = true;
+
+                // Per Default deaktiviert, wenn es ein reiner Server ist
+                ChatNachrichtenAktiv = !isDedicated;
+                KartenOverlayAktiv = !isDedicated;
+                ZeigeLokalenFortschritt = !isDedicated;
             }
         }
 
@@ -79,11 +85,11 @@ namespace EinmaligerSpawn.Config
             catch (Exception e)
             {
                 Log.Error($"[EinmaligerSpawn] Fehler beim Finden oder Erstellen des Ordners.: {e.Message}");
-
                 return;
             }
 
-            try { 
+            try
+            {
                 var config = new ConfigDaten
                 {
                     // alphabetische Reihenfolge der Eigenschaften

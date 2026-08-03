@@ -5,6 +5,7 @@ using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.LocalClear;
 using EinmaligerSpawn.Network;
+using EinmaligerSpawn.PoiTracker;
 using EinmaligerSpawn.ZombieSpawner;
 using UnityEngine;
 
@@ -18,6 +19,7 @@ namespace EinmaligerSpawn.Commands
         private const string HilfeText =
             "=== Client / User Befehle ===\n" +
             "Nutze 'es map <on/off/reload>' um das persönliche Karten-Overlay zu steuern oder Marker neu zu laden.\n" +
+            "Nutze 'es msg <on/off>' um deine lokalen Chat-Nachrichten der Mod ein- oder auszuschalten.\n" +
             "Nutze 'es progressbuff <on/off/time <sek>/radius <m>>' um den HUD-Fortschritt zu steuern, das Intervall oder den Suchradius anzupassen.\n" +
             "Nutze 'es range [radius] [name]' ODER 'es range [radius] [chunkX] [chunkZ]' um den Säuberungsfortschritt im Umkreis (Standard 120m) zu prüfen.\n" +
             "Nutze 'es where' als Universal-Radar, um den nähesten aktiven Zombie zu markieren.\n" +
@@ -65,6 +67,10 @@ namespace EinmaligerSpawn.Commands
                 case "map":
                     CmdMap(_params);
                     break;
+                case "message":
+                case "msg":
+                    CmdMsg(_params);
+                    break;
                 case "progressbuff":
                     CmdProgressBuff(player, _params);
                     break;
@@ -80,6 +86,8 @@ namespace EinmaligerSpawn.Commands
             }
         }
 
+        /// Steuert das persönliche Karten-Overlay oder lädt die Marker neu.
+        /// Aufruf: es map <on/off/reload>
         private void CmdMap(List<string> _params)
         {
             if (GameManager.IsDedicatedServer) return;
@@ -113,6 +121,36 @@ namespace EinmaligerSpawn.Commands
             }
         }
 
+        /// Schaltet die lokalen Chat-Nachrichten der Mod ein oder aus.
+        /// Aufruf: es msg <on/off>
+        private void CmdMsg(List<string> _params)
+        {
+            if (GameManager.IsDedicatedServer) return;
+
+            if (_params.Count < 2)
+            {
+                Log.Out($"Aktueller Status: {(ModEinstellungen.ChatNachrichtenAktiv ? "ON" : "OFF")}. Bitte nutze 'es msg on/off'.");
+                return;
+            }
+
+            string state = _params[1].ToLower();
+
+            if (state == "on" || state == "true")
+            {
+                ModEinstellungen.ChatNachrichtenAktiv = true;
+                ModEinstellungen.Speichern();
+                Log.Out("[EinmaligerSpawn] Lokale Chat-Nachrichten sind nun AKTIVIERT.");
+            }
+            else if (state == "off" || state == "false")
+            {
+                ModEinstellungen.ChatNachrichtenAktiv = false;
+                ModEinstellungen.Speichern();
+                Log.Out("[EinmaligerSpawn] Lokale Chat-Nachrichten sind nun DEAKTIVIERT.");
+            }
+        }
+
+        /// Steuert den HUD-Fortschritts-Buff, dessen Intervall oder dessen Suchradius.
+        /// Aufruf: es progressbuff <on/off/time <sek>/radius <meter>>
         private void CmdProgressBuff(EntityPlayerLocal player, List<string> _params)
         {
             if (GameManager.IsDedicatedServer) return;
@@ -165,6 +203,8 @@ namespace EinmaligerSpawn.Commands
             }
         }
 
+        /// Prüft den Säuberungsfortschritt im Umkreis.
+        /// Aufruf: es range [radius] [name] ODER es range [radius] [chunkX] [chunkZ]
         private void CmdRange(EntityPlayerLocal localPlayer, List<string> _params)
         {
             if (GameManager.IsDedicatedServer) return;
@@ -222,6 +262,8 @@ namespace EinmaligerSpawn.Commands
             Log.Out($"=== Spawn-Radar ({radiusMeter}m) für {targetPlayer.EntityName} ===\nStatus: {ergebnisSpieler.gesperrt}/{ergebnisSpieler.gesamt} ({ergebnisSpieler.prozent}%)");
         }
 
+        /// Markiert als Universal-Radar den nähesten aktiven Zombie in der Umgebung.
+        /// Aufruf: es where
         private void CmdWhere(EntityPlayerLocal player)
         {
             if (GameManager.IsDedicatedServer || player == null) return;
@@ -276,9 +318,9 @@ namespace EinmaligerSpawn.Commands
         private const string HilfeText =
             "=== Server / Admin Befehle ===\n" +
             "Nutze 'esa cheat_clear [Spieler] [radius] [reset]' um Chunks im Umkreis auf 'gesäubert' zu setzen oder den Status zu löschen.\n" +
+            "Nutze 'esa cheat_loud [Spieler/Coords] [Räume]' um schlafende Zombies im nächsten POI (max. 80m) zu wecken und aufzuscheuchen.\n" +
             "Nutze 'esa limit <Zahl>' um das globale Autospawn-Limit für Zombies auf dem Server festzulegen.\n" +
             "Nutze 'esa localclear <on/off/reason [name]>' für den autom. 4s-Clear (on/off) oder zur Fehlerdiagnose (reason).\n" +
-            "Nutze 'esa msg <on/off>' um die globalen Chat-Nachrichten der Mod für alle ein- oder auszuschalten.\n" +
             "Nutze 'esa range [Spieler] [radius]' um den geclearten Bereich um einen Spieler zu berechnen.\n" +
             "Nutze 'esa tactical <on/off>' um den serverseitigen Bonus-Clear (Taktischer Kill) ein- oder auszuschalten.\n" +
             "Nutze 'esa timer <Sekunden>' um das serverseitige Autospawn-Überprüfungsintervall anzupassen.";
@@ -298,9 +340,6 @@ namespace EinmaligerSpawn.Commands
             return HilfeText;
         }
 
-        // IsExecuteOnClient wird NICHT überschrieben -> Standard: false (läuft auf dem Server)
-        // DefaultPermissionLevel wird NICHT überschrieben -> Standard: 0 (nur Admins)
-
         public override void Execute(List<string> _params, CommandSenderInfo _senderInfo)
         {
             if (_params.Count == 0)
@@ -316,16 +355,16 @@ namespace EinmaligerSpawn.Commands
                 case "cheat_clear":
                     CmdCheatClear(_params, _senderInfo);
                     break;
+                case "cheat_loud":
+                case "loud":
+                    CmdCheatLoud(_params, _senderInfo);
+                    break;
                 case "limit":
                     CmdLimit(_params, _senderInfo);
                     break;
                 case "localclear":
                 case "walkclear":
                     CmdLocalClear(_params, _senderInfo);
-                    break;
-                case "message":
-                case "msg":
-                    CmdMsg(_params, _senderInfo);
                     break;
                 case "range":
                     CmdRangeAdmin(_params, _senderInfo);
@@ -344,6 +383,195 @@ namespace EinmaligerSpawn.Commands
             }
         }
 
+        /// Zwingt das nächste POI, seine schlafenden Zombies zu wecken und auf den Spieler zu hetzen
+        /// Aufruf: esa cheat_loud [Spielername/X Z] [AnzahlRäume]
+        private void CmdCheatLoud(List<string> _params, CommandSenderInfo _senderInfo)
+        {
+            int maxRaeume = 1;
+            EntityPlayer targetPlayer = null;
+            bool useCoords = false;
+            int targetX = 0, targetZ = 0;
+            string searchName = null;
+
+            // Parameter Parsing
+            if (_params.Count >= 4) // esa cheat_loud X Z Räume
+            {
+                if (int.TryParse(_params[1], out targetX) && int.TryParse(_params[2], out targetZ))
+                {
+                    useCoords = true;
+                    int.TryParse(_params[3], out maxRaeume);
+                }
+            }
+            else if (_params.Count == 3) // esa cheat_loud X Z (1 Raum) ODER esa cheat_loud Name Räume
+            {
+                if (int.TryParse(_params[1], out targetX) && int.TryParse(_params[2], out targetZ))
+                {
+                    useCoords = true;
+                    maxRaeume = 1;
+                }
+                else
+                {
+                    searchName = _params[1].ToLower();
+                    int.TryParse(_params[2], out maxRaeume);
+                }
+            }
+            else if (_params.Count == 2) // esa cheat_loud Räume ODER esa cheat_loud Name
+            {
+                if (int.TryParse(_params[1], out maxRaeume))
+                {
+                    // Ist eine Zahl -> Der Befehl richtet sich an den Sender selbst
+                }
+                else
+                {
+                    searchName = _params[1].ToLower();
+                    maxRaeume = 1; // Default
+                }
+            }
+
+            // Spielerauflösung (falls keine Koordinaten genutzt werden)
+            if (!useCoords)
+            {
+                if (!string.IsNullOrEmpty(searchName))
+                {
+                    foreach (EntityPlayer p in GameManager.Instance.World.Players.list)
+                    {
+                        if (p.EntityName.ToLower().Contains(searchName))
+                        {
+                            targetPlayer = p;
+                            break;
+                        }
+                    }
+                    if (targetPlayer == null)
+                    {
+                        SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Konnte Spieler '{searchName}' nicht finden.");
+                        return;
+                    }
+                }
+                else if (_senderInfo.RemoteClientInfo != null)
+                {
+                    GameManager.Instance.World.Players.dict.TryGetValue(_senderInfo.RemoteClientInfo.entityId, out targetPlayer);
+                }
+                else
+                {
+                    targetPlayer = GameManager.Instance.World.GetPrimaryPlayer();
+                }
+
+                if (targetPlayer == null)
+                {
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Dedicated Server erfordert einen Spielernamen oder Koordinaten!");
+                    return;
+                }
+            }
+
+            Vector2 startPos2D = useCoords ? new Vector2(targetX, targetZ) : new Vector2(targetPlayer.position.x, targetPlayer.position.z);
+
+            // Den nächsten aktiven POI finden
+            DynamicPrefabDecorator decorator = GameManager.Instance.GetDynamicPrefabDecorator();
+            if (decorator == null) return;
+
+            List<PrefabInstance> allPois = new List<PrefabInstance>();
+            decorator.GetPOIPrefabs(allPois);
+
+            PrefabInstance closestPoi = null;
+            float closestDistSq = float.MaxValue;
+
+            foreach (PrefabInstance poi in allPois)
+            {
+                // Ignoriere gesäuberte Gebäude und leere Wildnis
+                if (PoiDatenbank.IstGecleart(poi.id)) continue;
+                if (poi.sleeperVolumes == null || poi.sleeperVolumes.Count == 0) continue;
+
+                // Überprüfen, ob es wirklich noch aktive Räume gibt
+                bool hasUncleared = false;
+                foreach (SleeperVolume vol in poi.sleeperVolumes)
+                {
+                    if (!vol.wasCleared)
+                    {
+                        hasUncleared = true;
+                        break;
+                    }
+                }
+                if (!hasUncleared) continue;
+
+                // Distanz berechnen (Box-Kollision, um zu prüfen ob der Spieler bereits darin steht)
+                float minX = poi.boundingBoxPosition.x;
+                float maxX = minX + poi.boundingBoxSize.x;
+                float minZ = poi.boundingBoxPosition.z;
+                float maxZ = minZ + poi.boundingBoxSize.z;
+
+                float dx = Mathf.Max(0, Mathf.Max(minX - startPos2D.x, startPos2D.x - maxX));
+                float dz = Mathf.Max(0, Mathf.Max(minZ - startPos2D.y, startPos2D.y - maxZ));
+
+                float distSq = dx * dx + dz * dz;
+
+                if (distSq < closestDistSq)
+                {
+                    closestDistSq = distSq;
+                    closestPoi = poi;
+                }
+            }
+
+            if (closestPoi == null)
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Kein aktiver POI auf der Karte gefunden.");
+                return;
+            }
+
+            // Harte Grenze: Maximal 80 Meter
+            if (closestDistSq > 80f * 80f)
+            {
+                float actualDist = Mathf.Sqrt(closestDistSq);
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Abbruch: Der nächste aktive POI '{closestPoi.name}' ist {actualDist:0}m entfernt (Max. 80m erlaubt). Geh näher ran!");
+                return;
+            }
+
+            // Die Ausführung: Räume aktivieren
+            int triggeredRooms = 0;
+            foreach (SleeperVolume vol in closestPoi.sleeperVolumes)
+            {
+                if (vol.wasCleared) continue;
+
+                // true = die Zombies spawnen so, als hätten sie den Zielspieler direkt gesehen
+                vol.TouchGroup(GameManager.Instance.World, targetPlayer, true);
+                triggeredRooms++;
+
+                if (maxRaeume > 0 && triggeredRooms >= maxRaeume)
+                {
+                    break;
+                }
+            }
+
+            // AGGRO-SCHLEIFE: Sicherstellen, dass die Zombies (auch wenn sie vorher schliefen) aufwachen und rennen
+            Bounds poiBounds = new Bounds(
+                new Vector3(closestPoi.boundingBoxPosition.x + closestPoi.boundingBoxSize.x / 2f,
+                            closestPoi.boundingBoxPosition.y + closestPoi.boundingBoxSize.y / 2f,
+                            closestPoi.boundingBoxPosition.z + closestPoi.boundingBoxSize.z / 2f),
+                new Vector3(closestPoi.boundingBoxSize.x, closestPoi.boundingBoxSize.y, closestPoi.boundingBoxSize.z)
+            );
+
+            int additionalAggro = 0;
+            foreach (Entity ent in GameManager.Instance.World.Entities.list)
+            {
+                if (ent is EntityAlive enemy && (ent is EntityEnemy || ent is EntityZombie) && enemy.IsAlive())
+                {
+                    if (poiBounds.Contains(enemy.position))
+                    {
+                        enemy.IsSleeping = false;
+                        if (targetPlayer != null)
+                        {
+                            enemy.SetAttackTarget(targetPlayer, 1200);
+                        }
+                        additionalAggro++;
+                    }
+                }
+            }
+
+            string targetName = useCoords ? $"Koordinate [{targetX}, {targetZ}]" : targetPlayer?.EntityName ?? "Unbekannt";
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Cheat Loud: {triggeredRooms} Raum/Räume im POI '{closestPoi.name}' für {targetName} aktiviert! ({additionalAggro} Feinde in Alarmbereitschaft). Lasset die Spiele beginnen.");
+        }
+
+        /// Setzt Chunks im Umkreis auf gesäubert oder löscht den Status.
+        /// Aufruf: esa cheat_clear [Spieler] [Radius] [clear/reset]
         private void CmdCheatClear(List<string> _params, CommandSenderInfo _senderInfo)
         {
             EntityPlayer targetPlayer = null;
@@ -351,8 +579,6 @@ namespace EinmaligerSpawn.Commands
             bool isReset = false;
             string searchName = null;
 
-            // --- Intelligente Parameter-Auswertung ---
-            // Startet bei Index 1, da Index 0 der Befehl "cheat_clear" ist
             for (int i = 1; i < _params.Count; i++)
             {
                 string p = _params[i].ToLower();
@@ -367,15 +593,12 @@ namespace EinmaligerSpawn.Commands
                 }
                 else
                 {
-                    // Wenn es weder "clear/reset" noch eine Zahl ist, ist es der Spielername
                     searchName = p;
                 }
             }
 
-            // --- Spieler ermitteln ---
             if (!string.IsNullOrEmpty(searchName))
             {
-                // Name wurde übergeben -> Suche den Spieler auf dem Server
                 foreach (EntityPlayer p in GameManager.Instance.World.Players.list)
                 {
                     if (p.EntityName.ToLower().Contains(searchName))
@@ -393,23 +616,19 @@ namespace EinmaligerSpawn.Commands
             }
             else if (_senderInfo.RemoteClientInfo != null)
             {
-                // Kein Name übergeben, aber ein Remote-Admin (Mitspieler) hat den Befehl gesendet
                 GameManager.Instance.World.Players.dict.TryGetValue(_senderInfo.RemoteClientInfo.entityId, out targetPlayer);
             }
             else
             {
-                // Fallback für den lokalen Host
                 targetPlayer = GameManager.Instance.World.GetPrimaryPlayer();
             }
 
-            // Sicherheitsprüfung (z. B. wenn die dedizierte Konsole keinen Namen angibt)
             if (targetPlayer == null)
             {
                 SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Server-Konsole benötigt einen Spielernamen! Nutzung: 'esa cheat_clear [Spielername] [Radius] [clear/reset]'");
                 return;
             }
 
-            // --- Die eigentliche Logik ---
             Vector3i playerPos = targetPlayer.GetBlockPosition();
             int playerChunkX = playerPos.x >> 4;
             int playerChunkZ = playerPos.z >> 4;
@@ -428,7 +647,6 @@ namespace EinmaligerSpawn.Commands
                     int minZ = cz * 16;
                     int maxZ = minZ + 15;
 
-                    // Kreisberechnung für die Entfernung
                     int dx = Math.Max(0, Math.Max(minX - playerPos.x, playerPos.x - maxX));
                     int dz = Math.Max(0, Math.Max(minZ - playerPos.z, playerPos.z - maxZ));
 
@@ -454,7 +672,6 @@ namespace EinmaligerSpawn.Commands
                             KillCounter.ToteZombiesProChunk[chunkId]++;
                             newlyModified++;
 
-                            // Netzwerk-Update an alle Clients
                             SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
                         }
                     }
@@ -465,6 +682,8 @@ namespace EinmaligerSpawn.Commands
             SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Ich habe {totalChecked} Chunks im Umkreis von {targetPlayer.EntityName} geprüft und {newlyModified} {actionText}.");
         }
 
+        /// Legt das globale Autospawn-Limit für Zombies auf dem Server fest.
+        /// Aufruf: esa limit <Zahl>
         private void CmdLimit(List<string> _params, CommandSenderInfo _senderInfo)
         {
             if (_params.Count < 2 || !int.TryParse(_params[1], out int neuesLimit))
@@ -479,6 +698,8 @@ namespace EinmaligerSpawn.Commands
             SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Globales Autospawn-Limit wurde auf {neuesLimit} gesetzt.");
         }
 
+        /// Steuert den automatischen 4s-Clear oder startet eine Fehlerdiagnose.
+        /// Aufruf: esa localclear <on/off/reason [Spieler]>
         private void CmdLocalClear(List<string> _params, CommandSenderInfo _senderInfo)
         {
             string currentStatus = ModEinstellungen.LokalerChunkClearAktiv ? "ON" : "OFF";
@@ -533,38 +754,14 @@ namespace EinmaligerSpawn.Commands
             }
         }
 
-        private void CmdMsg(List<string> _params, CommandSenderInfo _senderInfo)
-        {
-            if (_params.Count < 2)
-            {
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Aktueller Status: {(ModEinstellungen.ChatNachrichtenAktiv ? "ON" : "OFF")}. Bitte nutze 'esa msg on/off'.");
-                return;
-            }
-
-            string state = _params[1].ToLower();
-
-            if (state == "on" || state == "true")
-            {
-                ModEinstellungen.ChatNachrichtenAktiv = true;
-                ModEinstellungen.Speichern();
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun AKTIVIERT.");
-            }
-            else if (state == "off" || state == "false")
-            {
-                ModEinstellungen.ChatNachrichtenAktiv = false;
-                ModEinstellungen.Speichern();
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Globale Chat-Nachrichten sind nun DEAKTIVIERT.");
-            }
-        }
-
+        /// Berechnet den geclearten Bereich um einen bestimmten Spieler.
+        /// Aufruf: esa range [Spieler] [Radius]
         private void CmdRangeAdmin(List<string> _params, CommandSenderInfo _senderInfo)
         {
             int radiusMeter = 120;
             string searchName = null;
             EntityPlayer targetPlayer = null;
 
-            // --- Intelligente Parameter-Auswertung ---
-            // Startet bei Index 1, da Index 0 der Befehl "range" ist
             for (int i = 1; i < _params.Count; i++)
             {
                 string p = _params[i].ToLower();
@@ -575,15 +772,12 @@ namespace EinmaligerSpawn.Commands
                 }
                 else
                 {
-                    // Wenn es keine Zahl ist, muss es der Spielername sein
                     searchName = p;
                 }
             }
 
-            // --- Spieler ermitteln ---
             if (!string.IsNullOrEmpty(searchName))
             {
-                // Name wurde übergeben -> Suche den Spieler auf dem Server
                 foreach (EntityPlayer p in GameManager.Instance.World.Players.list)
                 {
                     if (p.EntityName.ToLower().Contains(searchName))
@@ -601,23 +795,19 @@ namespace EinmaligerSpawn.Commands
             }
             else if (_senderInfo.RemoteClientInfo != null)
             {
-                // Kein Name übergeben, aber ein Remote-Admin (Mitspieler) hat den Befehl gesendet
                 GameManager.Instance.World.Players.dict.TryGetValue(_senderInfo.RemoteClientInfo.entityId, out targetPlayer);
             }
             else
             {
-                // Fallback für den lokalen Host (Singleplayer / lokaler Server)
                 targetPlayer = GameManager.Instance.World.GetPrimaryPlayer();
             }
 
-            // Sicherheitsprüfung (wenn die dedizierte Konsole keinen Namen angibt)
             if (targetPlayer == null)
             {
                 SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Server-Konsole benötigt einen Spielernamen! Nutzung: 'esa range [Spielername] [Radius]'");
                 return;
             }
 
-            // --- Die eigentliche Logik ---
             Vector3i pos = targetPlayer.GetBlockPosition();
             var ergebnis = KillCounter.BerechneLokalenFortschritt(pos.x >> 4, pos.z >> 4, radiusMeter);
 
@@ -625,6 +815,8 @@ namespace EinmaligerSpawn.Commands
             SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Status: {ergebnis.gesperrt}/{ergebnis.gesamt} ({ergebnis.prozent}%)");
         }
 
+        /// Schaltet den serverseitigen Bonus-Clear (Taktischer Kill) ein oder aus.
+        /// Aufruf: esa tactical <on/off>
         private void CmdTactical(List<string> _params, CommandSenderInfo _senderInfo)
         {
             if (_params.Count < 2)
@@ -649,6 +841,8 @@ namespace EinmaligerSpawn.Commands
             }
         }
 
+        /// Passt das serverseitige Autospawn-Überprüfungsintervall an.
+        /// Aufruf: esa timer <Sekunden>
         private void CmdTimer(List<string> _params, CommandSenderInfo _senderInfo)
         {
             if (_params.Count < 2 || !float.TryParse(_params[1], out float neuerTimer))

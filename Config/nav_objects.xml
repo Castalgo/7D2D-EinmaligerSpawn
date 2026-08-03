@@ -1,0 +1,36 @@
+<configs>
+	<append xpath="/nav_object_classes">
+
+		<!-- Globaler Marker (> 48m): Mitte des POIs. Icon: Haus -->
+		<nav_object_class name="es_poi_global">
+			<map_settings>
+				<property name="sprite_name" value="ui_game_symbol_map_house"/>
+				<property name="color" value="255,128,0,255"/>
+				<property name="min_distance" value="0"/>
+				<property name="max_distance" value="-1"/>
+				<property name="has_pulse" value="false"/>
+			</map_settings>
+		</nav_object_class>
+
+		<!-- Lokaler Marker (<= 48m): Konkreter Raum. Icon: Roter Punkt -->
+		<nav_object_class name="es_poi_local">
+			<map_settings>
+				<property name="sprite_name" value="ui_game_symbol_enemy_dot"/>
+				<property name="color" value="255,0,0,255"/>
+				<property name="min_distance" value="0"/>
+				<property name="max_distance" value="-1"/>
+				<property name="has_pulse" value="true"/>
+			</map_settings>
+
+			<!-- Kompassanzeige, falls man es immer sehen will
+			<compass_settings>
+				<property name="sprite_name" value="ui_game_symbol_enemy_dot"/>
+				<property name="color" value="255,0,0,255"/>
+				<property name="min_distance" value="0"/>
+				<property name="max_distance" value="-1"/>
+				<property name="has_pulse" value="true"/>
+			</compass_settings>-->
+		</nav_object_class>
+
+	</append>
+</configs>

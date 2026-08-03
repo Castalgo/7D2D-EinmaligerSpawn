@@ -1,9 +1,10 @@
 ﻿using System.Collections.Generic;
 using EinmaligerSpawn.ChunkDatenbank;
-using EinmaligerSpawn.Config; 
+using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.LocalClear;
 using EinmaligerSpawn.Network;
+using EinmaligerSpawn.PoiTracker;
 using EinmaligerSpawn.ZombieSpawner;
 using HarmonyLib;
 
@@ -19,10 +20,11 @@ namespace EinmaligerSpawn.SaveLoadPatches
             string savePath = GameIO.GetSaveGameDir();
             if (!string.IsNullOrEmpty(savePath))
             {
-                // nur der Server speichert die Kill-Datenbank
+                // nur der Server speichert die Kill-Datenbanken
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
                     KillCounter.Save(savePath);
+                    PoiDatenbank.Save(savePath); // Neu hinzugefügt
                 }
 
                 // Einstellungen für dieses Savegame speichern
@@ -41,14 +43,15 @@ namespace EinmaligerSpawn.SaveLoadPatches
             string savePath = GameIO.GetSaveGameDir();
             if (!string.IsNullOrEmpty(savePath))
             {
-                // nur der Server lädt die Kill-Datenbank
+                // nur der Server lädt die Kill-Datenbanken
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
                     KillCounter.Load(savePath);
+                    PoiDatenbank.Load(savePath); // Neu hinzugefügt
                 }
 
                 // Einstellungen für diese Welt laden
-                ModEinstellungen.Laden(savePath);                
+                ModEinstellungen.Laden(savePath);
             }
         }
     }
@@ -80,6 +83,12 @@ namespace EinmaligerSpawn.SaveLoadPatches
             }
             if (KillCounter.ToteZombiesProChunk != null)
                 KillCounter.ToteZombiesProChunk.Clear();
+
+            // 5. POI-Datenbank leeren
+            if (PoiDatenbank.GecleartePOIs != null)
+            {
+                PoiDatenbank.GecleartePOIs.Clear();
+            }
         }
     }
 
@@ -123,7 +132,15 @@ namespace EinmaligerSpawn.SaveLoadPatches
                     }
                 }
 
-                Log.Out("[EinmaligerSpawn] Late-Init: Kartenoverlay und lokaler Fortschrittsbuff wurden initialisiert.");
+                // =================================================================
+                // NEU: POI Radar Manager lokal an den Spieler hängen
+                // =================================================================
+                if (localPlayer.gameObject.GetComponent<PoiRadarManager>() == null)
+                {
+                    localPlayer.gameObject.AddComponent<PoiRadarManager>();
+                }
+
+                Log.Out("[EinmaligerSpawn] Late-Init: Kartenoverlay, lokaler Fortschrittsbuff und POI-Radar wurden initialisiert.");
             }
 
             // =================================================================
@@ -147,17 +164,20 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 }
             }
 
-            // 4. Wenn die Welt noch komplett frisch ist, müssen wir nichts schicken
-            //if (relevanteChunks.Count == 0) return; // auskommentiert, damit die config übertragen wird
-
-            // 5. Briefumschlag packen (Phase 1 Konstruktor mit der kompletten Liste)
+            // 4. Briefumschlag packen (Phase 1 Konstruktor mit der kompletten Liste)
             NetPackageChunkSync package = NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLogin(relevanteChunks);
 
-            // 6. Das Paket GANZ GEZIELT nur an diesen einen Spieler senden
+            // 5. Das Paket GANZ GEZIELT nur an diesen einen Spieler senden
             _cInfo.SendPackage(package);
 
             Log.Out($"[EinmaligerSpawn] Netzwerk: Sende komplettes Chunk-Gedächtnis ({relevanteChunks.Count} Einträge) an Spieler {_cInfo.playerName}...");
+
+            // 6. POI-Gedächtnis an den Client senden
+            List<int> relevantePOIs = new List<int>(PoiDatenbank.GecleartePOIs.Keys);
+            NetPackagePoiSync poiPackage = NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLogin(relevantePOIs);
+            _cInfo.SendPackage(poiPackage);
+
+            Log.Out($"[EinmaligerSpawn] Netzwerk: Sende komplettes POI-Gedächtnis ({relevantePOIs.Count} Einträge) an Spieler {_cInfo.playerName}...");
         }
     }
-
 }
