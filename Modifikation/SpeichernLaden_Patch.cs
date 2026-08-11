@@ -89,6 +89,9 @@ namespace EinmaligerSpawn.SaveLoadPatches
             {
                 PoiDatenbank.GecleartePOIs.Clear();
             }
+
+            // 6. Map-Tracker leeren (NEU)
+            KartenOverlayManager.KartenOverlay.Reset();
         }
     }
 

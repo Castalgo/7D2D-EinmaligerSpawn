@@ -1,4 +1,5 @@
-﻿using EinmaligerSpawn.ChunkDatenbank;
+﻿using System.Collections.Generic;
+using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using HarmonyLib;
 using Unity.Collections;
@@ -13,6 +14,89 @@ namespace EinmaligerSpawn.KartenOverlayManager
     {
         public static bool IstAktiv { get; private set; } = false;
         public static XUiC_MapArea AktuelleMapArea { get; set; } = null;
+
+        // --- NEU: Tracking für die gelben Chunks ---
+        private static HashSet<string> knownClearedChunks = new HashSet<string>();
+        public static Dictionary<string, float> NeuGeclearteChunks = new Dictionary<string, float>();
+        private static bool isInitialized = false;
+        private static float nextUpdate = 0f;
+
+        // Der lokale Hintergrund-Tracker
+        public static void OnGameUpdate()
+        {
+            if (Time.time < nextUpdate) return;
+            nextUpdate = Time.time + 1f;
+
+            if (GameManager.Instance == null || GameManager.Instance.World == null) return;
+
+            bool needsRedraw = false;
+
+            // 1. Bereinigung: Falls Chunks per Admin-Cheat 'reset' zurückgesetzt wurden
+            if (knownClearedChunks.Count > KillCounter.ToteZombiesProChunk.Count)
+            {
+                List<string> removed = new List<string>();
+                foreach (string key in knownClearedChunks)
+                {
+                    if (!KillCounter.ToteZombiesProChunk.ContainsKey(key) || KillCounter.ToteZombiesProChunk[key] < 1)
+                    {
+                        removed.Add(key);
+                    }
+                }
+                foreach (string key in removed)
+                {
+                    knownClearedChunks.Remove(key);
+                    NeuGeclearteChunks.Remove(key);
+                    needsRedraw = true; // Karte aktualisieren, da der Chunk wieder unsichtbar wird
+                }
+            }
+
+            // 2. Suche nach NEUEN Chunks
+            foreach (var kvp in KillCounter.ToteZombiesProChunk)
+            {
+                if (kvp.Value >= 1 && !knownClearedChunks.Contains(kvp.Key))
+                {
+                    knownClearedChunks.Add(kvp.Key);
+
+                    // Nur gelb färben, wenn das Spiel bereits initial geladen wurde (verhindert komplett gelbe Map beim Login)
+                    if (isInitialized)
+                    {
+                        NeuGeclearteChunks[kvp.Key] = Time.time;
+                    }
+                }
+            }
+            isInitialized = true;
+
+            // 3. Suche nach ABGELAUFENEN Chunks (20 Sekunden)
+            List<string> expired = new List<string>();
+            foreach (var kvp in NeuGeclearteChunks)
+            {
+                if (Time.time - kvp.Value >= 20f)
+                {
+                    expired.Add(kvp.Key);
+                    needsRedraw = true; // Zwingt die Karte, den Chunk nun grün zu zeichnen
+                }
+            }
+
+            // Löschen der abgelaufenen Chunks
+            foreach (string key in expired)
+            {
+                NeuGeclearteChunks.Remove(key);
+            }
+
+            // Map Redraw feuern, wenn sich an den Farben etwas geändert hat
+            if (needsRedraw && IstAktiv && AktuelleMapArea != null)
+            {
+                ErzwingeRedraw();
+            }
+        }
+
+        // Leert das Gedächtnis beim Verlassen des Spiels
+        public static void Reset()
+        {
+            knownClearedChunks.Clear();
+            NeuGeclearteChunks.Clear();
+            isInitialized = false;
+        }
 
         public static void SetzeModus(bool aktiv)
         {
@@ -103,21 +187,20 @@ namespace EinmaligerSpawn.KartenOverlayManager
                 {
                     fontSize = 22,
                     fontStyle = FontStyle.Bold,
-                    alignment = TextAnchor.UpperRight
+                    alignment = TextAnchor.LowerCenter
                 };
             }
 
             // Schriftzug der Welt-Eroberung etwas verschieben:
-            int yPos = 69;          // Deutlich nach oben (rein in den schwarzen Balken)
-            int paddingRight = 375; // Massiv nach links geschoben (weg vom Ödland/Quest-Tracker)
+            int paddingBottom = 108;          // Deutlich nach oben (rein in den schwarzen Balken)
 
             // 1. Schatten (Y-Position + 2 Pixel für den Versatz)
             style.normal.textColor = Color.black;
-            GUI.Label(new Rect(0, yPos + 2, Screen.width - paddingRight, 50), cachedText, style);
+            GUI.Label(new Rect(0, 0, Screen.width, Screen.height - paddingBottom + 2), cachedText, style);
 
             // 2. Grüner Text
             style.normal.textColor = new Color(0.2f, 1f, 0.2f);
-            GUI.Label(new Rect(0, yPos, Screen.width - paddingRight, 50), cachedText, style);
+            GUI.Label(new Rect(0, 0, Screen.width, Screen.height - paddingBottom), cachedText, style);
         }
     }
 
@@ -190,6 +273,9 @@ namespace EinmaligerSpawn.KartenOverlayManager
 
                     if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills) && kills >= 1)
                     {
+                        // NEU: Ist dieser Chunk frisch gecleart (und soll gelb leuchten)?
+                        bool isNeuGecleart = KartenOverlay.NeuGeclearteChunks.ContainsKey(chunkId);
+
                         for (int pixelIndex = 0; pixelIndex < 256; pixelIndex++)
                         {
                             int pixelOffsetZ = pixelIndex / 16;
@@ -207,6 +293,12 @@ namespace EinmaligerSpawn.KartenOverlayManager
                                 byte r = (byte)(originalPixel.r * deckkraftHintergrund);
                                 byte g = (byte)Mathf.Clamp((originalPixel.g * deckkraftHintergrund) + 80f, 0, 255);
                                 byte b = (byte)(originalPixel.b * deckkraftHintergrund);
+
+                                if (isNeuGecleart)
+                                {
+                                    // Gelb erzeugen: Wir heben zusätzlich zur Grün-Färbung den Rot-Kanal maximal an
+                                    r = (byte)Mathf.Clamp((originalPixel.r * deckkraftHintergrund) + 120f, 0, 255);
+                                }
 
                                 rawTextureData[eindimensionalerIndex] = new Color32(r, g, b, originalPixel.a);
                             }

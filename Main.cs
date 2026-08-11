@@ -1,8 +1,10 @@
 ﻿using System.Reflection;
 using EinmaligerSpawn.HUD;
 using EinmaligerSpawn.LocalClear;
+using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.Network;
 using EinmaligerSpawn.ZombieSpawner;
+using EinmaligerSpawn.KartenOverlayManager; // NEU
 using HarmonyLib;
 using UnityEngine;
 
@@ -17,8 +19,8 @@ namespace EinmaligerSpawn
             var harmony = new Harmony("com.castalgo.einmaligerspawn");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
 
-            // Dem Spiel unser neues Netzwerk-Paket offiziell bekannt machen
-            //NetPackageManager.RegisterPackage<NetPackageChunkSync>();
+            // Minimap-Patch initialisieren
+            SimpleMinimap_Patch.VersuchePatch(harmony);
 
             // Patch für alle gemoddeten Änderungen, die auf GameUpdate angewiesen sind
             ModEvents.GameUpdate.RegisterHandler((ref ModEvents.SGameUpdateData data) =>
@@ -26,7 +28,7 @@ namespace EinmaligerSpawn
                 AutoSpawner.OnGameUpdate();
                 LokalenChunkSaeubern.OnGameUpdate();
                 FortschrittsBuff.OnGameUpdate();
-                // KartenOverlay wird im SpeichernLaden_Patch.cs beim Welt betreten aufgerufen
+                KartenOverlay.OnGameUpdate(); // NEU: Der Hintergrund-Tracker für gelbe Chunks
             });
 
             Log.Out("[EinmaligerSpawn] Alle Patches erfolgreich geladen!");

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
@@ -103,17 +104,17 @@ namespace EinmaligerSpawn.Commands
             if (state == "on" || state == "true")
             {
                 KartenOverlay.SetzeModus(true);
-                Log.Out("[EinmaligerSpawn] Deine persönliche Eroberungs-Karte (Overlay) ist nun AKTIVIERT.");
+                Log.Out("[ES Map] Deine persönliche Eroberungs-Karte (Overlay) ist nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 KartenOverlay.SetzeModus(false);
-                Log.Out("[EinmaligerSpawn] Deine persönliche Eroberungs-Karte (Overlay) ist nun DEAKTIVIERT.");
+                Log.Out("[ES Map] Deine persönliche Eroberungs-Karte (Overlay) ist nun DEAKTIVIERT.");
             }
             else if (state == "reload")
             {
                 KartenOverlay.Reload();
-                Log.Out("[EinmaligerSpawn] Deine Karte (Marker) wurde erfolgreich neu geladen.");
+                Log.Out("[ES Map] Deine Karte (Marker) wurde erfolgreich neu geladen.");
             }
             else
             {
@@ -139,13 +140,13 @@ namespace EinmaligerSpawn.Commands
             {
                 ModEinstellungen.ChatNachrichtenAktiv = true;
                 ModEinstellungen.Speichern();
-                Log.Out("[EinmaligerSpawn] Lokale Chat-Nachrichten sind nun AKTIVIERT.");
+                Log.Out("[ES Msg] Lokale Chat-Nachrichten sind nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 ModEinstellungen.ChatNachrichtenAktiv = false;
                 ModEinstellungen.Speichern();
-                Log.Out("[EinmaligerSpawn] Lokale Chat-Nachrichten sind nun DEAKTIVIERT.");
+                Log.Out("[ES Msg] Lokale Chat-Nachrichten sind nun DEAKTIVIERT.");
             }
         }
 
@@ -167,7 +168,7 @@ namespace EinmaligerSpawn.Commands
             {
                 ModEinstellungen.ZeigeLokalenFortschritt = true;
                 ModEinstellungen.Speichern();
-                Log.Out("[EinmaligerSpawn] Lokaler Fortschritts-Buff ist nun AKTIVIERT.");
+                Log.Out("[ES Buff] Lokaler Fortschritts-Buff ist nun AKTIVIERT.");
 
                 if (player != null && !player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
                     player.Buffs.AddBuff("buffEinmaligerSpawnProgress");
@@ -176,7 +177,7 @@ namespace EinmaligerSpawn.Commands
             {
                 ModEinstellungen.ZeigeLokalenFortschritt = false;
                 ModEinstellungen.Speichern();
-                Log.Out("[EinmaligerSpawn] Lokaler Fortschritts-Buff ist nun DEAKTIVIERT.");
+                Log.Out("[ES Buff] Lokaler Fortschritts-Buff ist nun DEAKTIVIERT.");
 
                 if (player != null && player.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
                     player.Buffs.RemoveBuff("buffEinmaligerSpawnProgress");
@@ -188,7 +189,7 @@ namespace EinmaligerSpawn.Commands
                     neuerTimer = Mathf.Clamp(neuerTimer, 0.1f, 10f);
                     ModEinstellungen.BuffUpdateIntervall = neuerTimer;
                     ModEinstellungen.Speichern();
-                    Log.Out($"[EinmaligerSpawn] Das Update-Intervall für den Fortschritts-Buff wurde auf {neuerTimer} Sekunden gesetzt.");
+                    Log.Out($"[ES Buff] Das Update-Intervall für den Fortschritts-Buff wurde auf {neuerTimer} Sekunden gesetzt.");
                 }
             }
             else if (state == "radius")
@@ -198,7 +199,7 @@ namespace EinmaligerSpawn.Commands
                     neuerRadius = Mathf.Clamp(neuerRadius, 16, 1000);
                     ModEinstellungen.ProgressBuffRadius = neuerRadius;
                     ModEinstellungen.Speichern();
-                    Log.Out($"[EinmaligerSpawn] Der Suchradius für den Fortschritts-Buff wurde auf {neuerRadius} Meter gesetzt.");
+                    Log.Out($"[ES Buff] Der Suchradius für den Fortschritts-Buff wurde auf {neuerRadius} Meter gesetzt.");
                 }
             }
         }
@@ -300,11 +301,11 @@ namespace EinmaligerSpawn.Commands
                 }
 
                 NavObjectManager.Instance.RegisterNavObject(magicClassName, closestEnemy.transform, "ui_game_symbol_enemy_dot", false);
-                Log.Out($"[ES Spawner] Universal-Radar: Nächster Feind (Typ: {closestEnemy.GetType().Name}) ist {Mathf.RoundToInt(closestDist)}m entfernt.");
+                Log.Out($"[ES Where] Universal-Radar: Nächster Feind (Typ: {closestEnemy.GetType().Name}) ist {Mathf.RoundToInt(closestDist)}m entfernt.");
             }
             else
             {
-                Log.Out("[ES Spawner] Universal-Radar: Keine lebenden Feinde im Umfeld.");
+                Log.Out("[ES Where] Universal-Radar: Keine lebenden Feinde im Umfeld.");
             }
         }
     }
@@ -443,7 +444,9 @@ namespace EinmaligerSpawn.Commands
                     }
                     if (targetPlayer == null)
                     {
-                        SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Konnte Spieler '{searchName}' nicht finden.");
+                        string msg = $"[ESa loud] Konnte Spieler '{searchName}' nicht finden.";
+                        SingletonMonoBehaviour<SdtdConsole>.Instance.Output(msg);
+                        Log.Out(msg);
                         return;
                     }
                 }
@@ -458,7 +461,9 @@ namespace EinmaligerSpawn.Commands
 
                 if (targetPlayer == null)
                 {
-                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Dedicated Server erfordert einen Spielernamen oder Koordinaten!");
+                    string msg = "[ESa loud] Dedicated Server erfordert einen Spielernamen oder Koordinaten!";
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output(msg);
+                    Log.Out(msg);
                     return;
                 }
             }
@@ -477,11 +482,11 @@ namespace EinmaligerSpawn.Commands
 
             foreach (PrefabInstance poi in allPois)
             {
-                // Ignoriere gesäuberte Gebäude und leere Wildnis
+                // Ignoriere Gebäude, die wir bereits endgültig gecleart haben
                 if (PoiDatenbank.IstGecleart(poi.id)) continue;
                 if (poi.sleeperVolumes == null || poi.sleeperVolumes.Count == 0) continue;
 
-                // Überprüfen, ob es wirklich noch aktive Räume gibt
+                // Überprüfen, ob es laut Vanilla noch aktive Räume gibt
                 bool hasUncleared = false;
                 foreach (SleeperVolume vol in poi.sleeperVolumes)
                 {
@@ -493,7 +498,7 @@ namespace EinmaligerSpawn.Commands
                 }
                 if (!hasUncleared) continue;
 
-                // Distanz berechnen (Box-Kollision, um zu prüfen ob der Spieler bereits darin steht)
+                // Distanz berechnen
                 float minX = poi.boundingBoxPosition.x;
                 float maxX = minX + poi.boundingBoxSize.x;
                 float minZ = poi.boundingBoxPosition.z;
@@ -513,7 +518,9 @@ namespace EinmaligerSpawn.Commands
 
             if (closestPoi == null)
             {
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Kein aktiver POI auf der Karte gefunden.");
+                string msg = "[ESa loud] Kein aktiver POI auf der Karte gefunden.";
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output(msg);
+                Log.Out(msg);
                 return;
             }
 
@@ -521,18 +528,21 @@ namespace EinmaligerSpawn.Commands
             if (closestDistSq > 80f * 80f)
             {
                 float actualDist = Mathf.Sqrt(closestDistSq);
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Abbruch: Der nächste aktive POI '{closestPoi.name}' ist {actualDist:0}m entfernt (Max. 80m erlaubt). Geh näher ran!");
+                string msg = $"[ESa loud] Abbruch: Der nächste aktive POI '{closestPoi.name}' ist {actualDist:0}m entfernt (Max. 80m erlaubt). Geh näher ran!";
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output(msg);
+                Log.Out(msg);
                 return;
             }
 
             // Die Ausführung: Räume aktivieren
             int triggeredRooms = 0;
+
             foreach (SleeperVolume vol in closestPoi.sleeperVolumes)
             {
                 if (vol.wasCleared) continue;
 
-                // true = die Zombies spawnen so, als hätten sie den Zielspieler direkt gesehen
-                vol.TouchGroup(GameManager.Instance.World, targetPlayer, true);
+                // false = triggert die normale Vanilla-Spawn-Warteschlange (inklusive Auto-Clean bei 0 Spawns)
+                vol.TouchGroup(GameManager.Instance.World, targetPlayer, false);
                 triggeredRooms++;
 
                 if (maxRaeume > 0 && triggeredRooms >= maxRaeume)
@@ -541,7 +551,7 @@ namespace EinmaligerSpawn.Commands
                 }
             }
 
-            // AGGRO-SCHLEIFE: Sicherstellen, dass die Zombies (auch wenn sie vorher schliefen) aufwachen und rennen
+            // AGGRO-SCHLEIFE: Weckt zusätzlich alle bereits existierenden (physisch vorhandenen) Zombies im POI
             Bounds poiBounds = new Bounds(
                 new Vector3(closestPoi.boundingBoxPosition.x + closestPoi.boundingBoxSize.x / 2f,
                             closestPoi.boundingBoxPosition.y + closestPoi.boundingBoxSize.y / 2f,
@@ -567,7 +577,22 @@ namespace EinmaligerSpawn.Commands
             }
 
             string targetName = useCoords ? $"Koordinate [{targetX}, {targetZ}]" : targetPlayer?.EntityName ?? "Unbekannt";
-            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Cheat Loud: {triggeredRooms} Raum/Räume im POI '{closestPoi.name}' für {targetName} aktiviert! ({additionalAggro} Feinde in Alarmbereitschaft). Lasset die Spiele beginnen.");
+            string finalMsg = $"[ESa loud] Cheat Loud: {triggeredRooms} Raum/Räume im POI '{closestPoi.name}' für {targetName} getriggert! ({additionalAggro} bereits existierende Feinde aufgeweckt). Asynchroner Spawnvorgang gestartet.";
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output(finalMsg);
+            Log.Out(finalMsg);
+
+            // Automatisches Radar verzögert ausführen, damit die Zombies Zeit zum Spawnen haben
+            GameManager.Instance.StartCoroutine(VerzoegertesWhere(_senderInfo));
+        }
+
+        // Hilfsmethode von CmdCheatLoud, um den Radar-Befehl nach einer kurzen Verzögerung auszuführen
+        private System.Collections.IEnumerator VerzoegertesWhere(CommandSenderInfo _senderInfo)
+        {
+            // Wir warten 2 Sekunden, bis die Vanilla UpdateSpawn-Warteschlange abgearbeitet ist
+            yield return new UnityEngine.WaitForSeconds(2f);
+
+            // Führt den Befehl über das Spielsystem exakt so aus, als hätte der Sender ihn selbst eingetippt
+            SingletonMonoBehaviour<SdtdConsole>.Instance.ExecuteSync("es where", _senderInfo.RemoteClientInfo);
         }
 
         /// Setzt Chunks im Umkreis auf gesäubert oder löscht den Status.
@@ -610,7 +635,7 @@ namespace EinmaligerSpawn.Commands
 
                 if (targetPlayer == null)
                 {
-                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Konnte den Spieler '{searchName}' nicht finden.");
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa range] Konnte den Spieler '{searchName}' nicht finden.");
                     return;
                 }
             }
@@ -625,7 +650,7 @@ namespace EinmaligerSpawn.Commands
 
             if (targetPlayer == null)
             {
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Server-Konsole benötigt einen Spielernamen! Nutzung: 'esa cheat_clear [Spielername] [Radius] [clear/reset]'");
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[ESa range] Server-Konsole benötigt einen Spielernamen! Nutzung: 'esa cheat_clear [Spielername] [Radius] [clear/reset]'");
                 return;
             }
 
@@ -679,7 +704,7 @@ namespace EinmaligerSpawn.Commands
             }
 
             string actionText = isReset ? "reaktiviert (Reset)" : "neu ausgerottet (Clear)";
-            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Ich habe {totalChecked} Chunks im Umkreis von {targetPlayer.EntityName} geprüft und {newlyModified} {actionText}.");
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa range] Ich habe {totalChecked} Chunks im Umkreis von {targetPlayer.EntityName} geprüft und {newlyModified} {actionText}.");
         }
 
         /// Legt das globale Autospawn-Limit für Zombies auf dem Server fest.
@@ -695,7 +720,7 @@ namespace EinmaligerSpawn.Commands
             neuesLimit = Mathf.Max(1, neuesLimit);
             ModEinstellungen.GlobalesZombieLimit = neuesLimit;
             ModEinstellungen.Speichern();
-            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Globales Autospawn-Limit wurde auf {neuesLimit} gesetzt.");
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa limit] Globales Autospawn-Limit wurde auf {neuesLimit} gesetzt.");
         }
 
         /// Steuert den automatischen 4s-Clear oder startet eine Fehlerdiagnose.
@@ -703,21 +728,38 @@ namespace EinmaligerSpawn.Commands
         private void CmdLocalClear(List<string> _params, CommandSenderInfo _senderInfo)
         {
             string currentStatus = ModEinstellungen.LokalerChunkClearAktiv ? "ON" : "OFF";
+            bool fromUI = false;
+            string searchName = null;
 
-            if (_params.Count < 2)
+            // Parameter filtern, um "ui" zu erkennen
+            List<string> cleanParams = new List<string>();
+            for (int i = 1; i < _params.Count; i++)
+            {
+                string p = _params[i].ToLower();
+                if (p == "ui")
+                {
+                    fromUI = true;
+                }
+                else
+                {
+                    cleanParams.Add(p);
+                }
+            }
+
+            if (cleanParams.Count == 0)
             {
                 SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Aktueller Status: {currentStatus}. Bitte nutze 'esa localclear on/off/reason'.");
                 return;
             }
 
-            string state = _params[1].ToLower();
+            string state = cleanParams[0];
 
             if (state == "reason" || state == "grund")
             {
                 EntityPlayer targetPlayer = null;
-                if (_params.Count >= 3)
+                if (cleanParams.Count >= 2)
                 {
-                    string searchName = _params[2].ToLower();
+                    searchName = cleanParams[1].ToLower();
                     foreach (EntityPlayer p in GameManager.Instance.World.Players.list)
                     {
                         if (p.EntityName.ToLower().Contains(searchName))
@@ -734,8 +776,15 @@ namespace EinmaligerSpawn.Commands
 
                 if (targetPlayer != null)
                 {
-                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Starte Diagnose für Spieler: {targetPlayer.EntityName}");
-                    LokalenChunkSaeubern.Diagnose(targetPlayer);
+                    string msg = $"[ESa localclear] Starte Diagnose für Spieler: {targetPlayer.EntityName}";
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output(msg);
+
+                    // Aufruf der Diagnose mit dem neuen fromUI-Parameter
+                    LokalenChunkSaeubern.Diagnose(targetPlayer, fromUI);
+                }
+                else
+                {
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa localclear] Konnte den Spieler '{searchName}' nicht finden.");
                 }
                 return;
             }
@@ -744,13 +793,13 @@ namespace EinmaligerSpawn.Commands
             {
                 ModEinstellungen.LokalerChunkClearAktiv = true;
                 ModEinstellungen.Speichern();
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Lokaler Chunk-Clear ist nun AKTIVIERT.");
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[ESa localclear] Lokaler Chunk-Clear ist nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 ModEinstellungen.LokalerChunkClearAktiv = false;
                 ModEinstellungen.Speichern();
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Lokaler Chunk-Clear ist nun DEAKTIVIERT.");
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[ESa localclear] Lokaler Chunk-Clear ist nun DEAKTIVIERT.");
             }
         }
 
@@ -761,12 +810,17 @@ namespace EinmaligerSpawn.Commands
             int radiusMeter = 120;
             string searchName = null;
             EntityPlayer targetPlayer = null;
+            bool fromUI = false;
 
             for (int i = 1; i < _params.Count; i++)
             {
                 string p = _params[i].ToLower();
 
-                if (int.TryParse(p, out int parsedRadius))
+                if (p == "ui")
+                {
+                    fromUI = true;
+                }
+                else if (int.TryParse(p, out int parsedRadius))
                 {
                     radiusMeter = Mathf.Clamp(parsedRadius, 1, 10000);
                 }
@@ -789,7 +843,7 @@ namespace EinmaligerSpawn.Commands
 
                 if (targetPlayer == null)
                 {
-                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Konnte den Spieler '{searchName}' nicht finden.");
+                    SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa range] Konnte den Spieler '{searchName}' nicht finden.");
                     return;
                 }
             }
@@ -804,15 +858,43 @@ namespace EinmaligerSpawn.Commands
 
             if (targetPlayer == null)
             {
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Server-Konsole benötigt einen Spielernamen! Nutzung: 'esa range [Spielername] [Radius]'");
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[ESa range] Server-Konsole benötigt einen Spielernamen! Nutzung: 'esa range [Spielername] [Radius] [ui]'");
                 return;
             }
 
             Vector3i pos = targetPlayer.GetBlockPosition();
             var ergebnis = KillCounter.BerechneLokalenFortschritt(pos.x >> 4, pos.z >> 4, radiusMeter);
 
-            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"=== Admin Spawn-Radar ({radiusMeter}m) für {targetPlayer.EntityName} ===");
-            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"Status: {ergebnis.gesperrt}/{ergebnis.gesamt} ({ergebnis.prozent}%)");
+            string msg1 = $"Spieler {targetPlayer.EntityName} hat um sich herum ({radiusMeter}m)";
+            string msg2 = $"{ergebnis.gesperrt} von {ergebnis.gesamt} ({ergebnis.prozent}%) gecleart.";
+
+            // F1-Konsole (wird IMMER gemacht)
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output(msg1);
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output(msg2);
+
+            // Globaler Spielchat (NUR wenn aus dem Menü aufgerufen, dank "fromUI" Erkennung)
+            if (fromUI)
+            {
+                GameManager.Instance.ChatMessageServer(
+                    null,
+                    EChatType.Global,
+                    -1,
+                    msg1,
+                    null,
+                    EMessageSender.Server,
+                    GeneratedTextManager.BbCodeSupportMode.Supported
+                );
+
+                GameManager.Instance.ChatMessageServer(
+                    null,
+                    EChatType.Global,
+                    -1,
+                    msg2,
+                    null,
+                    EMessageSender.Server,
+                    GeneratedTextManager.BbCodeSupportMode.Supported
+                );
+            }
         }
 
         /// Schaltet den serverseitigen Bonus-Clear (Taktischer Kill) ein oder aus.
@@ -831,13 +913,13 @@ namespace EinmaligerSpawn.Commands
             {
                 ModEinstellungen.TaktischerKillAktiv = true;
                 ModEinstellungen.Speichern();
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Taktischer Kill ist nun AKTIVIERT.");
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[ESa tactical] Taktischer Kill ist nun AKTIVIERT.");
             }
             else if (state == "off" || state == "false")
             {
                 ModEinstellungen.TaktischerKillAktiv = false;
                 ModEinstellungen.Speichern();
-                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[EinmaligerSpawn] Taktischer Kill ist nun DEAKTIVIERT.");
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[ESa tactical] Taktischer Kill ist nun DEAKTIVIERT.");
             }
         }
 
@@ -854,7 +936,326 @@ namespace EinmaligerSpawn.Commands
             neuerTimer = Mathf.Max(1f, neuerTimer);
             ModEinstellungen.SpawnCheckIntervall = neuerTimer;
             ModEinstellungen.Speichern();
-            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[EinmaligerSpawn] Autospawn-Intervall wurde auf {neuerTimer} Sekunden gesetzt.");
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa timer] Autospawn-Intervall wurde auf {neuerTimer} Sekunden gesetzt.");
+        }
+    }
+
+    // =========================================================================================
+    // TEMPORÄRER BENCHMARK BEFEHL (Forensische Autopsie der Abweichungen)
+    // =========================================================================================
+    public class ConsoleCmdEinmaligerSpawnBenchmark : ConsoleCmdAbstract
+    {
+        public override string[] getCommands() { return new string[] { "esb" }; }
+        public override string getDescription() { return "Analysiert exakt, WARUM Math und Physik abweichen."; }
+        public override string getHelp() { return "Nutzung: 'esb analyze'"; }
+
+        public override void Execute(List<string> _params, CommandSenderInfo _senderInfo)
+        {
+            if (_params.Count > 0 && _params[0].ToLower() == "analyze")
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("[ES Benchmark] Starte forensische Autopsie...");
+                Log.Out("[ES Benchmark] Starte forensische Autopsie der Chunk-Abweichungen...");
+                GameManager.Instance.StartCoroutine(DoAnalyzeCoroutine());
+            }
+            else
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output("Bitte 'esb analyze' nutzen.");
+            }
+        }
+
+        private System.Collections.IEnumerator DoAnalyzeCoroutine()
+        {
+            IChunkProvider chunkProvider = GameManager.Instance.World.ChunkCache.ChunkProvider;
+            IBiomeProvider biomeProvider = chunkProvider.GetBiomeProvider();
+            ITerrainGenerator terrainGenerator = chunkProvider.GetTerrainGenerator();
+
+            HashSetLong loadedChunks = GameManager.Instance.World.ChunkCache.GetChunkKeysCopySync();
+
+            int neuBesser = 0; // Neu findet Platz (weil Gras ignoriert), Alt scheitert
+            int neuSchlechter = 0; // Alt findet Platz, Neu verbietet ihn fälschlicherweise
+            int processedChunks = 0;
+
+            Dictionary<string, int> gruppierteAutopsien = new Dictionary<string, int>();
+            List<PrefabInstance> overlappingPOIs = new List<PrefabInstance>();
+
+            foreach (long key in loadedChunks)
+            {
+                Chunk physChunk = (Chunk)GameManager.Instance.World.ChunkCache.GetChunkSync(key);
+                if (physChunk == null) continue;
+
+                int cx = physChunk.X;
+                int cz = physChunk.Z;
+                int minWorldX = cx * 16;
+                int minWorldZ = cz * 16;
+                int maxWorldX = minWorldX + 15;
+                int maxWorldZ = minWorldZ + 15;
+
+                overlappingPOIs.Clear();
+                GameManager.Instance.World.GetPOIsAtXZ(minWorldX, maxWorldX, minWorldZ, maxWorldZ, overlappingPOIs);
+
+                for (int x = 0; x < 16; x++)
+                {
+                    for (int z = 0; z < 16; z++)
+                    {
+                        int worldX = minWorldX + x;
+                        int worldZ = minWorldZ + z;
+
+                        // ==========================================
+                        // 1. NEUER HYBRID-ANSATZ (Mathe-AABB + Mathe-Y + Vanilla-SpawnCheck)
+                        // ==========================================
+                        bool mathInPOI = false;
+                        for (int i = 0; i < overlappingPOIs.Count; i++)
+                        {
+                            PrefabInstance pi = overlappingPOIs[i];
+                            if (pi.prefab != null && pi.prefab.Tags.Test_AnySet(DynamicPrefabDecorator.streetTileTag)) continue;
+
+                            if (worldX >= pi.boundingBoxPosition.x && worldX < pi.boundingBoxPosition.x + pi.boundingBoxSize.x &&
+                                worldZ >= pi.boundingBoxPosition.z && worldZ < pi.boundingBoxPosition.z + pi.boundingBoxSize.z)
+                            {
+                                mathInPOI = true;
+                                break;
+                            }
+                        }
+
+                        byte mathY = terrainGenerator.GetTerrainHeightByteAt(worldX, worldZ);
+                        BlockValue mathTopBlock = biomeProvider.GetTopmostBlockValue(worldX, worldZ);
+                        bool mathIsWater = mathTopBlock.Block != null && mathTopBlock.Block.blockMaterial.IsLiquid;
+
+                        // DER NEUE MAGISCHE CHECK: Wir prüfen CanMobsSpawn auf der Höhe der nackten Erde!
+                        bool mathCanSpawn = physChunk.CanMobsSpawnAtPos(x, mathY + 1, z, false, true);
+
+                        bool mathValid = !mathInPOI && !mathIsWater && mathCanSpawn;
+
+                        // ==========================================
+                        // 2. ALTER LIVE-SPAWNER-ANSATZ (Zum Vergleichen)
+                        // ==========================================
+                        int physY = (int)(physChunk.GetHeight(x, z) + 1);
+                        bool physIsWater = physChunk.IsWater(x, physY - 1, z);
+                        bool physCanSpawn = physChunk.CanMobsSpawnAtPos(x, physY, z, false, true);
+                        Vector3 worldPos = new Vector3(worldX, physY, worldZ);
+                        bool physHasPOI = GameManager.Instance.World.GetPOIAtPosition(worldPos, null, null) != null;
+
+                        bool physValid = !physIsWater && physCanSpawn && !physHasPOI;
+
+                        // ==========================================
+                        // 3. AUSWERTUNG BEI ABWEICHUNG
+                        // ==========================================
+                        if (mathValid != physValid)
+                        {
+                            if (mathValid && !physValid) neuBesser++;
+                            if (!mathValid && physValid) neuSchlechter++;
+
+                            int normMathY = 50;
+                            int normPhysY = 50;
+                            if (mathY < physY) normPhysY = 50 + (physY - mathY);
+                            else if (physY < mathY) normMathY = 50 + (mathY - physY);
+                            int normBlockY = normPhysY - 1;
+
+                            BlockValue blockBelowPhys = physChunk.GetBlock(x, physY - 1, z);
+                            string blockNamePhys = blockBelowPhys.Block != null ? blockBelowPhys.Block.GetBlockName() : "NULL/Air";
+
+                            string typStr = mathValid ? "ERFOLG: Neu hat Platz gefunden (Gras umgangen)" : "FEHLER: Alt hat Platz gefunden, Neu hat blockiert";
+
+                            string groupKey =
+                                $"Typ: {typStr}\n" +
+                                $"[Y-Werte] Neu(Erde) Y: {normMathY} | Alt(Spitze) Y: {normPhysY}\n" +
+                                $"[POI]     Neu AABB-POI: {mathInPOI} | Alt Point-POI: {physHasPOI}\n" +
+                                $"[Block]   Alt stolperte über: {blockNamePhys}";
+
+                            if (!gruppierteAutopsien.ContainsKey(groupKey))
+                            {
+                                gruppierteAutopsien[groupKey] = 0;
+                            }
+                            gruppierteAutopsien[groupKey]++;
+                        }
+                    }
+                }
+
+                processedChunks++;
+                if (processedChunks % 10 == 0) yield return null;
+            }
+
+            // ==========================================
+            // 4. AUSGABE
+            // ==========================================
+            List<KeyValuePair<string, int>> sortedList = new List<KeyValuePair<string, int>>(gruppierteAutopsien);
+            sortedList.Sort((a, b) => b.Value.CompareTo(a.Value));
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.AppendLine("\n==================================================");
+            sb.AppendLine("=== ULTIMATIVER HYBRID-BENCHMARK BEENDET ===");
+            sb.AppendLine("==================================================");
+            sb.AppendLine($"NEU BESSER (Gras/Hindernis umgangen): {neuBesser} Fälle");
+            sb.AppendLine($"NEU SCHLECHTER (Falsch blockiert): {neuSchlechter} Fälle\n");
+
+            foreach (var kvp in sortedList)
+            {
+                sb.AppendLine($"{kvp.Value}x AUFGETRETEN:");
+                sb.AppendLine(kvp.Key);
+                sb.AppendLine("--------------------------------------------------");
+            }
+
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output(sb.ToString());
+            Log.Out(sb.ToString());
+
+            yield break;
+        }
+    }
+
+
+    // =========================================================================================
+    // Holzhammer Benchmark
+    // =========================================================================================
+    public class ConsoleCmdEscHolzhammer : ConsoleCmdAbstract
+    {
+        public override string[] getCommands()
+        {
+            return new string[] { "escholzhammer" };
+        }
+
+        public override string getDescription()
+        {
+            return "Prüft die GESAMTE KARTE (mit pre-cached 54-Punkte-Muster & Early-Exit) im Main-Thread. (ACHTUNG: MASSIVER FREEZE/RAM-GEFAHR!)";
+        }
+
+        public override void Execute(List<string> _params, CommandSenderInfo _senderInfo)
+        {
+            SdtdConsole.Instance.Output("[ES Benchmark] HOLZHAMMER GESTARTET! Das Spiel friert jetzt komplett ein...");
+            Log.Out("[ES Benchmark] HOLZHAMMER gestartet. Pre-cached Dart-Muster generiert. Lese gesamte Map...");
+
+            Stopwatch sw = Stopwatch.StartNew();
+
+            IChunkProvider chunkProvider = GameManager.Instance.World.ChunkCache.ChunkProvider;
+            IBiomeProvider biomeProvider = chunkProvider.GetBiomeProvider();
+            ITerrainGenerator terrainGenerator = chunkProvider.GetTerrainGenerator();
+            GameRandom rand = GameManager.Instance.World.GetGameRandom();
+
+            List<PrefabInstance> overlappingPOIs = new List<PrefabInstance>();
+
+            // ==========================================
+            // 1. DART-MUSTER EINMALIG GENERIEREN (Pre-Caching)
+            // ==========================================
+            int[] dartX = new int[54];
+            int[] dartZ = new int[54];
+
+            // 4 Ecken
+            dartX[0] = 0; dartZ[0] = 0;
+            dartX[1] = 0; dartZ[1] = 15;
+            dartX[2] = 15; dartZ[2] = 0;
+            dartX[3] = 15; dartZ[3] = 15;
+
+            // 50 Zufallspunkte
+            for (int i = 4; i < 54; i++)
+            {
+                dartX[i] = rand.RandomRange(0, 16);
+                dartZ[i] = rand.RandomRange(0, 16);
+            }
+
+            // ==========================================
+            // 2. KARTENGRÖSSE ERMITTELN
+            // ==========================================
+            int worldSize = GamePrefs.GetInt(EnumGamePrefs.WorldGenSize);
+            int halfSize = worldSize / 2;
+            int minChunk = -halfSize / 16;
+            int maxChunk = (halfSize / 16) - 1;
+
+            int totalChunks = 0;
+            int validChunks = 0;
+            int totalBlocksChecked = 0;
+
+            // ==========================================
+            // 3. SCHLEIFE ÜBER DIE GESAMTE KARTE
+            // ==========================================
+            for (int cx = minChunk; cx <= maxChunk; cx++)
+            {
+                for (int cz = minChunk; cz <= maxChunk; cz++)
+                {
+                    long key = WorldChunkCache.MakeChunkKey(cx, cz);
+
+                    // Chunk synchron laden
+                    Chunk physChunk = (Chunk)GameManager.Instance.World.ChunkCache.GetChunkSync(key);
+                    if (physChunk == null) continue;
+
+                    totalChunks++;
+
+                    int minWorldX = cx * 16;
+                    int minWorldZ = cz * 16;
+                    int maxWorldX = minWorldX + 15;
+                    int maxWorldZ = minWorldZ + 15;
+
+                    overlappingPOIs.Clear();
+                    GameManager.Instance.World.GetPOIsAtXZ(minWorldX, maxWorldX, minWorldZ, maxWorldZ, overlappingPOIs);
+
+                    bool chunkIsSpawntauglich = false;
+
+                    // 4. Das vorgefertigte 54-Punkte-Muster abfeuern
+                    for (int k = 0; k < 54; k++)
+                    {
+                        totalBlocksChecked++;
+
+                        int px = dartX[k];
+                        int pz = dartZ[k];
+
+                        int worldX = minWorldX + px;
+                        int worldZ = minWorldZ + pz;
+
+                        // POI-Check mit Straßen-Ausnahme
+                        bool mathInPOI = false;
+                        for (int i = 0; i < overlappingPOIs.Count; i++)
+                        {
+                            PrefabInstance pi = overlappingPOIs[i];
+                            if (pi.prefab != null && pi.prefab.Tags.Test_AnySet(DynamicPrefabDecorator.streetTileTag)) continue;
+
+                            if (worldX >= pi.boundingBoxPosition.x && worldX < pi.boundingBoxPosition.x + pi.boundingBoxSize.x &&
+                                worldZ >= pi.boundingBoxPosition.z && worldZ < pi.boundingBoxPosition.z + pi.boundingBoxSize.z)
+                            {
+                                mathInPOI = true;
+                                break;
+                            }
+                        }
+
+                        if (mathInPOI) continue;
+
+                        // Mathe-Y-Check
+                        byte mathY = terrainGenerator.GetTerrainHeightByteAt(worldX, worldZ);
+                        BlockValue mathTopBlock = biomeProvider.GetTopmostBlockValue(worldX, worldZ);
+                        bool mathIsWater = mathTopBlock.Block != null && mathTopBlock.Block.blockMaterial.IsLiquid;
+
+                        if (mathIsWater) continue;
+
+                        // Hybrid-Spawn-Check
+                        if (physChunk.CanMobsSpawnAtPos(px, mathY + 1, pz, false, true))
+                        {
+                            chunkIsSpawntauglich = true;
+                            break; // EARLY EXIT
+                        }
+                    }
+
+                    if (chunkIsSpawntauglich)
+                    {
+                        validChunks++;
+                    }
+                }
+            }
+
+            sw.Stop();
+
+            // ==========================================
+            // 5. ERGEBNIS AUSGEBEN
+            // ==========================================
+            string result =
+                $"\n==================================================\n" +
+                $"=== HOLZHAMMER (GESAMTE KARTE) BEENDET ===\n" +
+                $"==================================================\n" +
+                $"Dauer des Freezes: {sw.ElapsedMilliseconds} ms ({(sw.ElapsedMilliseconds / 1000f):0.00} Sekunden)\n" +
+                $"Kartengröße:       {worldSize}x{worldSize}\n" +
+                $"Geprüfte Chunks:   {totalChunks:N0}\n" +
+                $"Spawntauglich:     {validChunks:N0}\n" +
+                $"Block-Abfragen:    {totalBlocksChecked:N0} (Dank Early-Exit & Pre-Cache extrem reduziert)\n" +
+                $"==================================================\n";
+
+            Log.Out(result);
+            SdtdConsole.Instance.Output(result);
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.Network;
 using UnityEngine;
 
@@ -149,14 +150,27 @@ namespace EinmaligerSpawn.LocalClear
 
             KillCounter.ToteZombiesProChunk[chunkId] = 1;
 
-            Log.Out($"[EinmaligerSpawn] Walkthrough-Clear: Chunk {chunkId} wurde durch friedliche Präsenz von '{player.EntityName}' gesäubert.");
+            Log.Warning($"[EinmaligerSpawn] Walkthrough-Clear: Chunk {chunkId} wurde durch friedliche Präsenz von '{player.EntityName}' gesäubert.");
 
-            // CHAT ENTFERNT: Die Clients werten das nun über das Netzwerkpaket lokal aus.
+            // Chatnachricht im Einzelspieler und für den Host im Multiplayer
+            if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+            {
+                ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+
+                // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
+                string feedbackMsg = $"[00FF00][{timeString}] Walkthrough-Clear: Chunk {chunkId} wurde durch friedliche Präsenz von '{player.EntityName}' gesäubert.[-]";
+
+                GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+            }
 
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
                 SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
             }
+
+            // erzwingt Minimap Update, sofern Minimap Mod aktiv
+            SimpleMinimap_Patch.ErzwingeRedraw = true;
 
             return true;
         }
@@ -167,8 +181,18 @@ namespace EinmaligerSpawn.LocalClear
             playerProtectionLost.Clear();
         }
 
-        public static void Diagnose(EntityPlayer player)
+        public static void Diagnose(EntityPlayer player, bool fromUI = false)
         {
+            // Hilfs-Methode: Leitet Text an die Konsole und (falls fromUI true ist) in den Spielchat
+            void OutputMsg(string text)
+            {
+                SingletonMonoBehaviour<SdtdConsole>.Instance.Output(text);
+                if (fromUI)
+                {
+                    GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, text, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                }
+            }
+
             if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
                 Log.Warning("[EinmaligerSpawn] Diagnose abgebrochen: Dieser Befehl steht nur dem Host der Sitzung zur Verfügung.");
@@ -177,7 +201,7 @@ namespace EinmaligerSpawn.LocalClear
 
             if (!ModEinstellungen.LokalerChunkClearAktiv)
             {
-                Log.Warning("[EinmaligerSpawn] Diagnose: 'localclear' ist in der Config deaktiviert (OFF).");
+                OutputMsg("[EinmaligerSpawn] Diagnose: 'localclear' ist in der Config deaktiviert (OFF).");
                 return;
             }
 
@@ -189,7 +213,7 @@ namespace EinmaligerSpawn.LocalClear
             if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
             {
                 int kills = KillCounter.ToteZombiesProChunk[chunkId];
-                Log.Out($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Dieser Chunk ({chunkId}) ist bereits als gesäubert markiert! Registrierte Kills hier: {kills}");
+                OutputMsg($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Dieser Chunk ({chunkId}) ist bereits als gesäubert markiert! Registrierte Kills hier: {kills}");
                 return;
             }
 
@@ -235,12 +259,12 @@ namespace EinmaligerSpawn.LocalClear
             if (blockierendeZombies.Count > 0)
             {
                 string grund = "";
-                if (angreiferGefunden) grund += $"- Der Spieler ({player.EntityName}) ist im Kampf (Wird anvisiert)\n";
+                if (angreiferGefunden) grund += "- Der Spieler ist im Kampf (Wird anvisiert)\n";
                 if (bewohnerGefunden) grund += "- Mindestens ein Feind hält sich im Chunk auf\n";
                 if (ursprungGefunden) grund += "- Ein Zombie, der zu diesem Chunk gehört, lebt noch\n";
 
-                Log.Warning($"[EinmaligerSpawn] Diagnose für {player.EntityName} in {chunkId} fehlgeschlagen!\nGründe:\n{grund}");
-                Log.Warning($"[EinmaligerSpawn] Setze temporäre Radar-Marker auf {blockierendeZombies.Count} störende Feind(e)...");
+                OutputMsg($"[EinmaligerSpawn] Diagnose für {player.EntityName} in {chunkId} fehlgeschlagen!\nGründe:\n{grund}");
+                OutputMsg($"[EinmaligerSpawn] Setze temporäre Radar-Marker auf {blockierendeZombies.Count} störende Feind(e)...");
 
                 string magicClassName = "supply_drop";
                 if (NavObjectClass.NavObjectClassList != null)
@@ -270,11 +294,11 @@ namespace EinmaligerSpawn.LocalClear
             {
                 if (daten.ChunkId == chunkId)
                 {
-                    Log.Out($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Alles ruhig! Der Timer steht aktuell bei: {daten.ZeitImChunk:0.0} / {benoetigteZeit:0.0} Sekunden.");
+                    OutputMsg($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Alles ruhig! Der Timer steht aktuell bei: {daten.ZeitImChunk:0.0} / {benoetigteZeit:0.0} Sekunden.");
                 }
                 else
                 {
-                    Log.Out($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Alles ruhig! Der Spieler hat diesen Chunk aber gerade erst betreten. (0.0 / {benoetigteZeit:0.0} Sekunden).");
+                    OutputMsg($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Alles ruhig! Der Spieler hat diesen Chunk aber gerade erst betreten. (0.0 / {benoetigteZeit:0.0} Sekunden).");
                 }
             }
         }

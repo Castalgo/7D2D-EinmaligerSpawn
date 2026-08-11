@@ -80,9 +80,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Modifikation\AutoSpawner.cs" />
+    <Compile Include="Modifikation\Bugfix.cs" />
     <Compile Include="Modifikation\DynamischesSpawnLimit.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="Modifikation\FortschrittsBuff.cs" />
+    <Compile Include="Modifikation\Minimap_Patch.cs" />
     <Compile Include="Modifikation\Network.cs" />
     <Compile Include="Modifikation\POI_Tracker.cs" />
     <Compile Include="Modifikation\SpawnBlocker.cs" />
@@ -95,6 +97,7 @@
     <Compile Include="Modifikation\POI_Sleeper_Kontrolle.cs" />
     <Compile Include="Modifikation\SpeichernLaden_Patch.cs" />
     <Compile Include="Modifikation\TodesListener_Patch.cs" />
+    <Compile Include="Modifikation\XUiC_ModEinstellungen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -114,6 +117,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Config\spawning.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config\XUi_InGame\windows.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Config\XUi_InGame\xui.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="ModInfo.xml">

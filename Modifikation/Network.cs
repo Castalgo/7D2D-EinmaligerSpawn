@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
+using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.PoiTracker;
 using UnityEngine;
 
@@ -120,6 +121,9 @@ namespace EinmaligerSpawn.Network
 
                         GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
                     }
+
+                    // erzwingt Minimap Update, sofern Minimap Mod aktiv
+                    SimpleMinimap_Patch.ErzwingeRedraw = true;
                 }
             }
 
@@ -220,6 +224,9 @@ namespace EinmaligerSpawn.Network
 
                         GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
                     }
+
+                    // erzwingt Minimap Update, sofern Minimap Mod aktiv
+                    SimpleMinimap_Patch.ErzwingeRedraw = true;
                 }
             }
 
@@ -234,6 +241,59 @@ namespace EinmaligerSpawn.Network
         public override int GetLength()
         {
             return 1 + 2 + (gesaeubertePOIs.Count * 4);
+        }
+    }
+
+    public class NetPackagePoiRadarUpdate : NetPackage
+        {
+            private int poiId;
+            private Vector3 zielKoordinate;
+
+            // Leerer Konstruktor für die Engine
+            public NetPackagePoiRadarUpdate() { }
+
+            // Setup für den Versand durch den Server
+            public NetPackagePoiRadarUpdate Setup(int _poiId, Vector3 _zielKoordinate)
+            {
+                this.poiId = _poiId;
+                this.zielKoordinate = _zielKoordinate;
+                return this;
+            }
+
+            // Paket-Länge in Bytes (int = 4, Vector3 = 12 -> 16 Bytes)
+            public override int GetLength()
+            {
+                return 16;
+            }
+
+            // Schreiben der Daten in den Stream (Server)
+            public override void write(PooledBinaryWriter _writer)
+            {
+                base.write(_writer);
+                System.IO.BinaryWriter baseWriter = _writer;
+
+                baseWriter.Write(this.poiId);
+                baseWriter.Write(this.zielKoordinate.x);
+                baseWriter.Write(this.zielKoordinate.y);
+                baseWriter.Write(this.zielKoordinate.z);
+            }
+
+            // Lesen der Daten aus dem Stream (Client)
+            public override void read(PooledBinaryReader _reader)
+            {
+                System.IO.BinaryReader baseReader = _reader;
+
+                this.poiId = baseReader.ReadInt32(); // Hier baseReader nutzen
+                this.zielKoordinate = new Vector3(baseReader.ReadSingle(), baseReader.ReadSingle(), baseReader.ReadSingle());
+            }
+
+            // Ausführung, wenn das Paket ankommt
+            public override void ProcessPackage(World _world, GameManager _callbacks)
+            {
+                // Trägt die empfangene Koordinate ins "Gedächtnis" des Clients ein
+                if (_world == null) return;
+                PoiTracker.PoiRadarManager.ClientZiele[this.poiId] = this.zielKoordinate;
+
         }
     }
 }

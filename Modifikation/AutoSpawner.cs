@@ -56,11 +56,15 @@ namespace EinmaligerSpawn.ZombieSpawner
                 }
             }
 
-            List<EntityPlayer> players = GameManager.Instance.World.Players.list;
+            // -------------------------------------------------------------
+            // 0. Garbage-Collector: Geister-Zombies entfernen, die nicht mehr existieren
+            // -------------------------------------------------------------
+            SpawnBlocker.ZombieGarbageCollector.BereinigeGeisterZombies();
 
             // -------------------------------------------------------------
             // 1. Der asynchrone Hintergrund-Scanner (Dynamisches Budget)
             // -------------------------------------------------------------
+            List<EntityPlayer> players = GameManager.Instance.World.Players.list;
             ScanBackground(players);
 
             // =====================================================================
@@ -73,11 +77,10 @@ namespace EinmaligerSpawn.ZombieSpawner
             // =====================================================================
             if (currentZombies >= ModEinstellungen.GlobalesZombieLimit)
                 return;
-            
-            // -------------------------------------------------------------
-            // 2. Anfänger-Schutz-Buff
-            // -------------------------------------------------------------
 
+            // -------------------------------------------------------------
+            // 2. Spawn-Logik mit Quest-Override und Anfänger-Schutz
+            // -------------------------------------------------------------
             foreach (EntityPlayer player in players)
             {
                 int pid = player.entityId;
@@ -87,41 +90,77 @@ namespace EinmaligerSpawn.ZombieSpawner
 
                 playerSpawnTimers[pid] += passedTime;
 
+                // Basis-Wert
                 float drosselungsFaktor = 1f;
-                if (!playerProtectionLost.ContainsKey(pid))
-                    playerProtectionLost[pid] = false;
 
-                if (!playerProtectionLost[pid])
+                // ABSOLUTER OVERRIDE: Ist der Spieler aktiv IN einer gestarteten Quest?
+                bool isInQuest = false;
+                if (player.QuestJournal != null)
                 {
-                    int safeZoneLevel = GamePrefs.GetInt(EnumGamePrefs.PlayerSafeZoneLevel);
-                    int safeZoneHours = GamePrefs.GetInt(EnumGamePrefs.PlayerSafeZoneHours);
-                    float tagesLaengeEchtzeit = GamePrefs.GetInt(EnumGamePrefs.DayNightLength);
-                    float echteMinutenProGameStunde = tagesLaengeEchtzeit / 24f;
-                    float schutzZeitInEchtenMinuten = safeZoneHours * echteMinutenProGameStunde;
+                    Quest aktiveQuest = player.QuestJournal.FindActiveQuest();
 
-                    bool levelVerbraucht = player.Progression.Level > safeZoneLevel;
-                    bool zeitVerbraucht = player.totalTimePlayed > schutzZeitInEchtenMinuten;
+                    // Quest da UND Ausrufezeichen bereits geklickt?
+                    if (aktiveQuest != null && aktiveQuest.RallyMarkerActivated)
+                    {
+                        // Vanilla-Methode für die POI-Grenzen holen (inklusive der 5-Block-Toleranz)
+                        Rect questBounds = aktiveQuest.GetLocationRect();
 
-                    if (levelVerbraucht && zeitVerbraucht)
-                    {
-                        drosselungsFaktor = 1f;
-                        playerProtectionLost[pid] = true;
-                    }
-                    else if (levelVerbraucht || zeitVerbraucht)
-                    {
-                        drosselungsFaktor = 8f;
-                    }
-                    else
-                    {
-                        drosselungsFaktor = 15f;
+                        // Steht der Spieler physisch in diesem Bereich?
+                        if (questBounds != Rect.zero && questBounds.Contains(new Vector2(player.position.x, player.position.z)))
+                        {
+                            isInQuest = true;
+                        }
                     }
                 }
 
-                float requiredInterval = ModEinstellungen.SpawnCheckIntervall * drosselungsFaktor;
+                if (isInQuest)
+                {
+                    // Höchste Priorität: Überschreibt den Faktor komplett während der Mission
+                    drosselungsFaktor = 1000f;
+                }
+                else
+                {
+                    // ANFÄNGER-SCHUTZ: Wird nur berechnet, wenn wir NICHT in einer Quest sind
+                    if (!playerProtectionLost.ContainsKey(pid))
+                        playerProtectionLost[pid] = false;
+
+                    if (!playerProtectionLost[pid])
+                    {
+                        int safeZoneLevel = GamePrefs.GetInt(EnumGamePrefs.PlayerSafeZoneLevel);
+                        int safeZoneHours = GamePrefs.GetInt(EnumGamePrefs.PlayerSafeZoneHours);
+                        float tagesLaengeEchtzeit = GamePrefs.GetInt(EnumGamePrefs.DayNightLength);
+                        float echteMinutenProGameStunde = tagesLaengeEchtzeit / 24f;
+                        float schutzZeitInEchtenMinuten = safeZoneHours * echteMinutenProGameStunde;
+
+                        bool levelVerbraucht = player.Progression.Level > safeZoneLevel;
+                        bool zeitVerbraucht = player.totalTimePlayed > schutzZeitInEchtenMinuten;
+
+                        if (levelVerbraucht && zeitVerbraucht)
+                        {
+                            drosselungsFaktor = 1f;
+                            playerProtectionLost[pid] = true; // Schutz dauerhaft deaktivieren
+                        }
+                        else if (player.Progression.Level == 1) // Level 1
+                        {
+                            drosselungsFaktor = 100f;
+                        }
+                        else if (levelVerbraucht || zeitVerbraucht) // Zeit oder Level verbraucht, aber nicht beides
+                        {
+                            drosselungsFaktor = 15f;
+                        }
+                        else // Newbie-Schutz ab Level 2 und unter 7h
+                        {
+                            drosselungsFaktor = 30f;
+                        }
+                    }
+                }
 
                 // -------------------------------------------------------------
                 // 3. Die Spawn-Routine
                 // -------------------------------------------------------------
+
+                float requiredInterval = ModEinstellungen.SpawnCheckIntervall * drosselungsFaktor;
+                
                 if (playerSpawnTimers[pid] >= requiredInterval)
                 {
                     playerSpawnTimers[pid] = 0f;
@@ -132,153 +171,79 @@ namespace EinmaligerSpawn.ZombieSpawner
 
         private static void ScanBackground(List<EntityPlayer> players)
         {
+            // Definiere hier deinen maximalen Scan-Radius (z. B. 6 oder 7 Chunks um den Spieler)
+            int scanRadius = 7;
 
-            // ====================================================================================
-            // SCHRITT 1: VORFILTERN (Spieler die in gescannten Arealen sind rauswerfen)
-            // ====================================================================================
-            List<EntityPlayer> aktiveSpieler = new List<EntityPlayer>();
-            foreach (EntityPlayer p in players)
-            {
-                Vector3i pos = p.GetBlockPosition();
-                string centerId = $"{pos.x >> 4}_{pos.z >> 4}";
-
-                if (!ChunkSpawnbarkeitCache.TryGetValue(centerId, out ChunkScanStatus status) ||
-                    (status != ChunkScanStatus.Spawntauglich_UmgebungFertigGescannt && status != ChunkScanStatus.Gesaeubert_UmgebungFertigGescannt))
-                {
-                    aktiveSpieler.Add(p);
-                }
-            }
-
-            if (aktiveSpieler.Count == 0)
-            {
-                Log.Out($"[AutoSpawner-DEBUG] Background-Scan abgeschlossen. Alle Spieler sind in '_UmgebungFertigGescannt'-Chunks.");
-                return; // Niemand braucht Rechenleistung
-            }
-
-            // ==========================================
-            // SCHRITT 2: WERTE BERECHNEN (Listen bauen)
-            // ==========================================
-            Dictionary<EntityPlayer, List<Vector3i>> spielerKandidaten = new Dictionary<EntityPlayer, List<Vector3i>>();
-            GameRandom rand = GameManager.Instance.World.GetGameRandom();
-
-            foreach (EntityPlayer player in aktiveSpieler)
+            foreach (EntityPlayer player in players)
             {
                 Vector3i playerPos = player.GetBlockPosition();
                 int playerChunkX = playerPos.x >> 4;
                 int playerChunkZ = playerPos.z >> 4;
+                string centerChunkId = $"{playerChunkX}_{playerChunkZ}";
 
-                List<Vector3i> kandidaten = new List<Vector3i>();
-
-                foreach (int radius in ScanRingPrioritaeten)
+                // ====================================================================================
+                // SCHRITT 1: Vorab-Check direkt am Spieler
+                // ====================================================================================
+                if (ChunkSpawnbarkeitCache.TryGetValue(centerChunkId, out ChunkScanStatus status) &&
+                    (status == ChunkScanStatus.Spawntauglich_UmgebungFertigGescannt || status == ChunkScanStatus.Gesaeubert_UmgebungFertigGescannt))
                 {
-                    for (int x = -radius; x <= radius; x++)
+                    continue; // Spieler befindet sich in einer fertig gescannten Umgebung -> überspringen
+                }
+
+                bool offeneChunksGefunden = false;
+
+                // ====================================================================================
+                // SCHRITT 2: Lineares Raster (Oben links nach unten rechts)
+                // ====================================================================================
+                for (int x = -scanRadius; x <= scanRadius; x++)
+                {
+                    for (int z = -scanRadius; z <= scanRadius; z++)
                     {
-                        for (int z = -radius; z <= radius; z++)
+                        int targetCx = playerChunkX + x;
+                        int targetCz = playerChunkZ + z;
+                        string chunkId = $"{targetCx}_{targetCz}";
+
+                        // 1. RAM-Check: Wurde der Chunk in dieser Session schon geprüft?
+                        if (ChunkSpawnbarkeitCache.ContainsKey(chunkId)) continue;
+
+                        // 2. Datenbank-Check (Langzeitgedächtnis)
+                        if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills))
                         {
-                            if (Mathf.Abs(x) != radius && Mathf.Abs(z) != radius) continue;
+                            if (kills >= 1) continue; // Chunk ist ausgerottet -> Überspringen
 
-                            int targetCx = playerChunkX + x;
-                            int targetCz = playerChunkZ + z;
-                            string chunkId = $"{targetCx}_{targetCz}";
-
-                            // 1. RAM-Check: Wurde der Chunk in dieser Session schon geprüft?
-                            if (ChunkSpawnbarkeitCache.ContainsKey(chunkId)) continue;
-
-                            // 2. Datenbank-Check (Langzeitgedächtnis)
-                            if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills))
+                            if (kills == 0)
                             {
-                                if (kills >= 1) continue; // Chunk ist ausgerottet -> Überspringen
-
-                                if (kills == 0)
-                                {
-                                    // Chunk ist laut Datenbank spawntauglich! 
-                                    // Wir sparen uns den rechenintensiven Block-Scan und laden ihn direkt in den RAM.
-                                    ChunkSpawnbarkeitCache[chunkId] = ChunkScanStatus.Spawntauglich;
-                                    continue; // Nächster Kandidat
-                                }
+                                // Chunk ist laut Datenbank spawntauglich!
+                                ChunkSpawnbarkeitCache[chunkId] = ChunkScanStatus.Spawntauglich;
+                                continue; // Nächster Kandidat
                             }
-
-                            Chunk physChunk = (Chunk)GameManager.Instance.World.ChunkCache.GetChunkSync(targetCx, targetCz);
-                            if (physChunk == null) continue;
-
-                            kandidaten.Add(new Vector3i(targetCx, 0, targetCz));
                         }
+
+                        // 3. Ist der Chunk überhaupt physisch geladen?
+                        Chunk physChunk = (Chunk)GameManager.Instance.World.ChunkCache.GetChunkSync(targetCx, targetCz);
+                        if (physChunk == null)
+                        {
+                            offeneChunksGefunden = true; // WICHTIG: Chunk fehlt noch, Umgebung ist also nicht fertig scannbar!
+                            continue;
+                        }
+
+                        // 4. DIREKTER SCAN
+                        PruefeUndSpeichereChunk(targetCx, targetCz);
+                        offeneChunksGefunden = true; // Wir haben gerade gearbeitet, also im nächsten Frame noch mal prüfen lassen, ob jetzt ALLES sauber ist.
                     }
                 }
 
-                for (int i = 0; i < kandidaten.Count; i++)
+                // ====================================================================================
+                // SCHRITT 3: UMGEBUNG ABSCHLIESSEN
+                // ====================================================================================
+                if (!offeneChunksGefunden)
                 {
-                    int rndIndex = rand.RandomRange(i, kandidaten.Count);
-                    Vector3i temp = kandidaten[i];
-                    kandidaten[i] = kandidaten[rndIndex];
-                    kandidaten[rndIndex] = temp;
-                }
-
-                spielerKandidaten[player] = kandidaten;
-            }
-
-            // ==========================================
-            // SCHRITT 3: TICKETS VERTEILEN (Round-Robin)
-            // ==========================================
-            int remainingTickets = 800;
-
-            // Warteschlangen für faires Abwechseln bauen
-            Dictionary<EntityPlayer, Queue<Vector3i>> spielerWarteschlangen = new Dictionary<EntityPlayer, Queue<Vector3i>>();
-            List<EntityPlayer> aktiveRoundRobinSpieler = new List<EntityPlayer>();
-
-            foreach (var kvp in spielerKandidaten)
-            {
-                if (kvp.Value.Count > 0)
-                {
-                    spielerWarteschlangen[kvp.Key] = new Queue<Vector3i>(kvp.Value);
-                    aktiveRoundRobinSpieler.Add(kvp.Key);
-                }
-                else
-                {
-                    // Spieler hat keine Chunks mehr zum Prüfen -> Umgebung ist fertig
-                    Vector3i pos = kvp.Key.GetBlockPosition();
-                    string centerChunkId = $"{pos.x >> 4}_{pos.z >> 4}";
-
                     if (KillCounter.ToteZombiesProChunk.ContainsKey(centerChunkId) && KillCounter.ToteZombiesProChunk[centerChunkId] >= 1)
                         ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Gesaeubert_UmgebungFertigGescannt;
                     else
                         ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Spawntauglich_UmgebungFertigGescannt;
 
                     Log.Out($"[AutoSpawner-DEBUG] Umgebung um {centerChunkId} vollständig gescannt.");
-                }
-            }
-
-            // Round-Robin Schleife: Solange wir Tickets haben und Spieler noch Chunks prüfen wollen
-            while (remainingTickets > 0 && aktiveRoundRobinSpieler.Count > 0)
-            {
-                // Rückwärts-Schleife, um Spieler ohne offene Chunks sicher aus der Liste löschen zu können
-                for (int i = aktiveRoundRobinSpieler.Count - 1; i >= 0; i--)
-                {
-                    if (remainingTickets <= 0) break;
-
-                    EntityPlayer player = aktiveRoundRobinSpieler[i];
-                    Queue<Vector3i> warteschlange = spielerWarteschlangen[player];
-
-                    Vector3i gewaehlterChunk = warteschlange.Dequeue();
-
-                    int verbrauchteTickets = PruefeUndSpeichereChunk(gewaehlterChunk.x, gewaehlterChunk.z);
-                    remainingTickets -= verbrauchteTickets;
-
-                    // Wenn der Spieler keine Chunks mehr in seiner Warteschlange hat
-                    if (warteschlange.Count == 0)
-                    {
-                        Vector3i pos = player.GetBlockPosition();
-                        string centerChunkId = $"{pos.x >> 4}_{pos.z >> 4}";
-
-                        if (KillCounter.ToteZombiesProChunk.ContainsKey(centerChunkId) && KillCounter.ToteZombiesProChunk[centerChunkId] >= 1)
-                            ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Gesaeubert_UmgebungFertigGescannt;
-                        else
-                            ChunkSpawnbarkeitCache[centerChunkId] = ChunkScanStatus.Spawntauglich_UmgebungFertigGescannt;
-
-                        Log.Out($"[AutoSpawner-DEBUG] Umgebung um {centerChunkId} vollständig gescannt.");
-
-                        aktiveRoundRobinSpieler.RemoveAt(i);
-                    }
                 }
             }
         }

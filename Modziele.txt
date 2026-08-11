@@ -28,4 +28,15 @@ Idee für zukünftige Erweiterung
 ----------------------------------------------------------------
 - "easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen
 - Kill XP-Faktor einbauen???
-- Readme.md updaten
+
+- einige POIs gar nicht erfasst (Beispiel POI hat 0 Schädel)
+- komplette Karte scannen
+- Tiere (Hühner und Rehe) nicht am Spawn hindern, aber limitieren (also vorher mit dnspy auskundschaften)
+- Kartengröße auslesen und nicht feste nehmen <-- nur nötig wenn kompletter Kartenscan fehlschlägt
+- nachgucken, was passiert, wenn man einen Container nicht leert
+- notifications merken beim client
+- Stärke über 10
+- buffeinmaligerspawnprogress: Name, Beschreibung, Distanz
+- esa loud auf alle Räume die bereits aktiv spawnen
+
+- bekannte Bugs: Zombies vor Queststart ausrotten im POI

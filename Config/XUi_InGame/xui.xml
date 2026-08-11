@@ -1,0 +1,5 @@
+<configs>
+	<append xpath="/xui/window_group[@name='map']">
+		<window name="windowEinmaligerSpawnAdmin" />
+	</append>
+</configs>

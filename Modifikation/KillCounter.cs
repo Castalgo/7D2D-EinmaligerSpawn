@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using Newtonsoft.Json;
-using UnityEngine;
 using System.Linq;
 using EinmaligerSpawn.Config;
+using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.Network;
+using Newtonsoft.Json;
+using UnityEngine;
 
 namespace EinmaligerSpawn.ChunkDatenbank
 {
@@ -39,7 +40,20 @@ namespace EinmaligerSpawn.ChunkDatenbank
             {
                 Log.Warning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
 
-                // CHAT ENTFERNT: Der Client wertet das nun lokal aus.
+                // Chatnachricht im Einzelspieler und für den Host im Multiplayer
+                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                {
+                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                    string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+
+                    // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
+                    string feedbackMsg = $"[00FF00][{timeString}] Gebiet {chunkId} wurde dauerhaft gesäubert![-]";
+
+                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                }
+
+                // erzwingt Minimap Update, sofern Minimap Mod aktiv
+                SimpleMinimap_Patch.ErzwingeRedraw = true;
 
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
@@ -66,15 +80,42 @@ namespace EinmaligerSpawn.ChunkDatenbank
                 SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
             }
 
-            // CHAT ENTFERNT: Nur noch Server-Logs behalten
             if (istNachbar)
             {
                 Log.Warning($"[EinmaligerSpawn] Taktischer Bonus: Nachbar {chunkId} zusätzlich gesichert!");
+
+                // Chatnachricht im Einzelspieler und für den Host im Multiplayer
+                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                {
+                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                    string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+
+                    // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
+                    string feedbackMsg = $"[00FF00][{timeString}] Taktischer Clear: Nachbar {chunkId} wurde zusätzlich gesichert![-]";
+
+                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                }
             }
             else
             {
                 Log.Warning($"[EinmaligerSpawn] Taktischer Clear! Todes-Chunk {chunkId} wurde gesichert.");
+
+                // Chatnachricht im Einzelspieler und für den Host im Multiplayer
+                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                {
+                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                    string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+
+                    // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
+                    string feedbackMsg = $"[00FF00][{timeString}] Taktischer Clear: Todes-Ort {chunkId} wurde gesäubert![-]";
+
+                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                }
             }
+
+            // erzwingt Minimap Update, sofern Minimap Mod aktiv
+            SimpleMinimap_Patch.ErzwingeRedraw = true;
+
         }
 
         // Nur Server: Prüft, ob in diesem Chunk noch gespawnt werden darf

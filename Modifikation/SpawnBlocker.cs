@@ -1,4 +1,5 @@
-﻿using EinmaligerSpawn.ChunkDatenbank;
+﻿using System.Collections.Generic;
+using EinmaligerSpawn.ChunkDatenbank;
 using HarmonyLib;
 using UnityEngine;
 
@@ -78,6 +79,40 @@ namespace EinmaligerSpawn.SpawnBlocker
 
                     KillCounter.ZombieUrsprung[_entity.entityId] = exakterChunkID;
                 }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // TEIL 4: Die Garbage Collection für despawnte Zombies
+    // ---------------------------------------------------------
+    public static class ZombieGarbageCollector
+    {
+        // Wird vom AutoSpawner in regelmäßigen Abständen aufgerufen
+        public static void BereinigeGeisterZombies()
+        {
+            if (KillCounter.ZombieUrsprung.Count == 0) return;
+
+            List<int> geisterIds = new List<int>();
+
+            foreach (int zombieId in KillCounter.ZombieUrsprung.Keys)
+            {
+                // Prüft, ob die Entity-ID in der Welt noch existiert
+                if (!GameManager.Instance.World.Entities.dict.ContainsKey(zombieId))
+                {
+                    geisterIds.Add(zombieId);
+                }
+            }
+
+            if (geisterIds.Count > 0)
+            {
+                foreach (int id in geisterIds)
+                {
+                    KillCounter.ZombieUrsprung.Remove(id);
+                }
+
+                // Optional: Deaktivieren, wenn es zu viel im Log spamt
+                // Log.Out($"[EinmaligerSpawn] Garbage Collection: {geisterIds.Count} despawnte Geister-Zombies aus dem Gedächtnis gelöscht.");
             }
         }
     }

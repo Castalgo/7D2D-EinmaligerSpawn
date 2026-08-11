@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
+using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.Network;
 using EinmaligerSpawn.PoiTracker;
 using HarmonyLib;
@@ -209,14 +210,27 @@ namespace EinmaligerSpawn.SpawnBlocker
             if (istKomplettLeer)
             {
                 PoiDatenbank.SetzeGecleart(poi.id);
-                Log.Out($"[EinmaligerSpawn] POI '{poi.name}' (ID: {poi.id}) wurde restlos gesäubert!");
+                Log.Warning($"[EinmaligerSpawn] POI '{poi.name}' (ID: {poi.id}) wurde restlos gesäubert!");
 
-                // CHAT ENTFERNT: Die Auswertung passiert nun lokal über das Netzwerk-Paket.
+                // Chatnachricht im Einzelspieler und für den Host im Multiplayer
+                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                {
+                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                    string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+
+                    // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
+                    string feedbackMsg = $"[00FF00][{timeString}] POI {poi.name} wurde restlos gesäubert![-]";
+
+                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                }
 
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
                     SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id));
                 }
+
+                // erzwingt Minimap Update, sofern Minimap Mod aktiv
+                SimpleMinimap_Patch.ErzwingeRedraw = true;
             }
         }
     }

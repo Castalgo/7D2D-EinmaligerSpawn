@@ -2,85 +2,89 @@
 using System.Collections.Generic;
 using System.IO;
 using EinmaligerSpawn.Config;
+using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.Network;
 using Newtonsoft.Json;
 using UnityEngine;
+using static EinmaligerSpawn.Network.NetPackagePoiSync;
 
 namespace EinmaligerSpawn.PoiTracker
 {
     // Verwaltet den Status der gesäuberten POIs ressourcenschonend über deren eindeutige ID.
     public static class PoiDatenbank
+    {
+        // Speichert lediglich: PrefabInstance.id -> IstGecleart
+        public static Dictionary<int, bool> GecleartePOIs = new Dictionary<int, bool>();
+
+        // Markiert einen POI dauerhaft als gesäubert.
+        public static void SetzeGecleart(int poiId)
         {
-            // Speichert lediglich: PrefabInstance.id -> IstGecleart
-            public static Dictionary<int, bool> GecleartePOIs = new Dictionary<int, bool>();
-
-            // Markiert einen POI dauerhaft als gesäubert.
-            public static void SetzeGecleart(int poiId)
+            if (!GecleartePOIs.ContainsKey(poiId))
             {
-                if (!GecleartePOIs.ContainsKey(poiId))
-                {
-                    GecleartePOIs[poiId] = true;
-
-                    // TODO: Hier später (ähnlich wie beim Chunk-Clear) das NetPackage an die Clients feuern, 
-                    // wenn dies vom Server aufgerufen wird.
-                }
+                GecleartePOIs[poiId] = true;
             }
+        }
 
-            // Prüft, ob ein POI bereits gesäubert wurde. Standardwert ist false.
-            public static bool IstGecleart(int poiId)
-            {
-                return GecleartePOIs.TryGetValue(poiId, out bool gecleart) && gecleart;
-            }
+        // Prüft, ob ein POI bereits gesäubert wurde. Standardwert ist false.
+        public static bool IstGecleart(int poiId)
+        {
+            return GecleartePOIs.TryGetValue(poiId, out bool gecleart) && gecleart;
+        }
 
-            // Nur Server: Lädt die POI-Datenbank aus der JSON-Datei
-            public static void Load(string saveDir)
-            {
-                string path = Path.Combine(saveDir, "ausgerottetePOIs.json");
-                if (File.Exists(path))
-                {
-                    try
-                    {
-                        string json = File.ReadAllText(path);
-                        GecleartePOIs = JsonConvert.DeserializeObject<Dictionary<int, bool>>(json) ?? new Dictionary<int, bool>();
-                        Log.Out($"[EinmaligerSpawn] {GecleartePOIs.Count} POI-Daten erfolgreich geladen.");
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error($"[EinmaligerSpawn] Fehler beim Laden der POIs: {e.Message}");
-                    }
-                }
-                else
-                {
-                    GecleartePOIs.Clear();
-                }
-            }
-
-            // Nur Server: Speichert die POI-Datenbank in einer JSON-Datei
-            public static void Save(string saveDir)
+        // Nur Server: Lädt die POI-Datenbank aus der JSON-Datei
+        public static void Load(string saveDir)
+        {
+            string path = Path.Combine(saveDir, "ausgerottetePOIs.json");
+            if (File.Exists(path))
             {
                 try
                 {
-                    string path = Path.Combine(saveDir, "ausgerottetePOIs.json");
-                    string json = JsonConvert.SerializeObject(GecleartePOIs, Formatting.Indented);
-                    File.WriteAllText(path, json);
+                    string json = File.ReadAllText(path);
+                    GecleartePOIs = JsonConvert.DeserializeObject<Dictionary<int, bool>>(json) ?? new Dictionary<int, bool>();
+                    Log.Out($"[EinmaligerSpawn] {GecleartePOIs.Count} POI-Daten erfolgreich geladen.");
                 }
                 catch (Exception e)
                 {
-                    Log.Error($"[EinmaligerSpawn] Fehler beim Speichern der POIs: {e.Message}");
+                    Log.Error($"[EinmaligerSpawn] Fehler beim Laden der POIs: {e.Message}");
                 }
             }
+            else
+            {
+                GecleartePOIs.Clear();
+            }
+        }
+
+        // Nur Server: Speichert die POI-Datenbank in einer JSON-Datei
+        public static void Save(string saveDir)
+        {
+            try
+            {
+                string path = Path.Combine(saveDir, "ausgerottetePOIs.json");
+                string json = JsonConvert.SerializeObject(GecleartePOIs, Formatting.Indented);
+                File.WriteAllText(path, json);
+            }
+            catch (Exception e)
+            {
+                Log.Error($"[EinmaligerSpawn] Fehler beim Speichern der POIs: {e.Message}");
+            }
+        }
     }
 
-// Berechnet lokal auf dem Client die Distanzen zu ungesäuberten POIs 
-// und platziert dynamisch die entsprechenden XML-Map-Marker.
-public class PoiRadarManager : MonoBehaviour
+    // Berechnet lokal auf dem Client, ob der Spieler sich in einem ungesäuberten POI befindet, 
+    // und platziert dynamisch die entsprechenden XML-Map-Marker.
+    public class PoiRadarManager : MonoBehaviour
     {
         private float updateTimer = 0f;
         private const float UpdateIntervall = 2f;
-        private const float NahbereichDistanzSq = 48f * 48f;
 
-        // Das Dictionary dient als "Gedächtnis". Es verknüpft die POI-ID mit dem gesetzten Marker.
+        // Speicher für die Marker-Objekte
         private Dictionary<int, NavObject> aktiveMarker = new Dictionary<int, NavObject>();
+
+        // CLIENT-Gedächtnis: Hier landen die Koordinaten aus dem NetPackage
+        public static Dictionary<int, Vector3> ClientZiele = new Dictionary<int, Vector3>();
+
+        // SERVER-Gedächtnis: Verhindert, dass wir denselben Raum jede Sekunde neu funken
+        private static Dictionary<int, Vector3> ServerLetzteZiele = new Dictionary<int, Vector3>();
 
         void Update()
         {
@@ -94,94 +98,104 @@ public class PoiRadarManager : MonoBehaviour
 
         private void AktualisiereMarker()
         {
+            // Client only. Dedicated Server rausschmeißen
             EntityPlayerLocal player = GameManager.Instance.World.GetPrimaryPlayer();
             if (player == null) return;
 
+            // Abbruch, falls NavObjecte noch lädt (grafische Benutzeroberfläche)
+            if (!NavObjectManager.HasInstance) return;
+
+            // Abbruch, falls das POI-System der Engine noch lädt (Welt geladen)
             DynamicPrefabDecorator decorator = GameManager.Instance.GetDynamicPrefabDecorator();
             if (decorator == null) return;
 
             List<PrefabInstance> allePois = new List<PrefabInstance>();
             decorator.GetPOIPrefabs(allePois);
 
+            // Abbruch, falls die aktuelle Karte überhaupt keine POIs besitzt (z. B. in einer leeren Testwelt)
             if (allePois.Count == 0) return;
 
             Vector3 playerPos = player.position;
-
-            // In dieser Liste merken wir uns, welche POIs in DIESER Sekunde noch einen Marker brauchen
             HashSet<int> aktuellePoiIds = new HashSet<int>();
+            bool isServer = SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer;
 
             foreach (PrefabInstance poi in allePois)
             {
-                // FOG OF WAR CHECK: Ist der Bereich schon erkundet?
+                // FOG OF WAR CHECK
                 if (player.ChunkObserver != null && player.ChunkObserver.mapDatabase != null)
                 {
-                    // Weltkoordinaten in Chunk-Koordinaten umrechnen
                     int chunkX = World.toChunkXZ((int)poi.boundingBoxPosition.x);
                     int chunkZ = World.toChunkXZ((int)poi.boundingBoxPosition.z);
-
-                    // Den eindeutigen Key für die Datenbank generieren
                     long chunkKey = WorldChunkCache.MakeChunkKey(chunkX, chunkZ);
 
-                    // Wenn die Chunk-Datenbank diesen Key NICHT enthält, war der Spieler noch nie dort.
-                    // Das POI bleibt versteckt, wir brechen für dieses Haus hier ab.
-                    if (!player.ChunkObserver.mapDatabase.Contains(chunkKey))
-                    {
-                        continue;
-                    }
+                    if (!player.ChunkObserver.mapDatabase.Contains(chunkKey)) continue;
                 }
 
+                // 1. OBERSTE REGEL: Unsere Datenbank hat immer Recht!
                 if (PoiDatenbank.IstGecleart(poi.id)) continue;
-                if (poi.sleeperVolumes == null || poi.sleeperVolumes.Count == 0) continue;
 
-                // AUTO-DETECT FÜR ALTLASTEN
-                bool hatAktiveRaeume = false;
-                foreach (SleeperVolume volumen in poi.sleeperVolumes)
+                // 2. SERVER-LOGIK: Auto-Detect & Ziel-Ermittlung
+                if (isServer)
                 {
-                    if (!volumen.wasCleared)
-                    {
-                        hatAktiveRaeume = true;
-                        break;
-                    }
-                }
-
-                if (!hatAktiveRaeume)
-                {
-                    if (!PoiDatenbank.IstGecleart(poi.id))
+                    if (poi.sleeperVolumes == null || poi.sleeperVolumes.Count == 0)
                     {
                         PoiDatenbank.SetzeGecleart(poi.id);
-                        Log.Out($"[EinmaligerSpawn] Auto-Detect: Altes POI '{poi.name}' (ID: {poi.id}) als gesäubert erkannt und nachgetragen.");
+                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id));
+                        continue;
+                    }
 
-                        if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                    SleeperVolume naechsterAktiverRaum = null;
+                    foreach (SleeperVolume volumen in poi.sleeperVolumes)
+                    {
+                        if (!volumen.wasCleared)
                         {
-                            SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id));
+                            naechsterAktiverRaum = volumen;
+                            break;
                         }
-                        else
-                        {
-                            SingletonMonoBehaviour<ConnectionManager>.Instance.SendToServer(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id));
-                        }
+                    }
 
-                        // LOKALER CHAT FÜR DEN SPIELER, DER GERADE SCANT
+                    // POI ist restlos gecleart
+                    if (naechsterAktiverRaum == null)
+                    {
+                        PoiDatenbank.SetzeGecleart(poi.id);
+                        Log.Out($"[EinmaligerSpawn] Auto-Detect: POI '{poi.name}' (ID: {poi.id}) als gesäubert erkannt.");
+                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id));
+
                         if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
                         {
                             ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
                             string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
                             string feedbackMsg = $"[00FF00][{timeString}] POI {poi.name} wurde gecleart![-]";
-
-                            // Neu: ChatMessageClient statt ChatMessageServer
                             GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
                         }
+
+                        // erzwingt Minimap Update, sofern Minimap Mod aktiv
+                        SimpleMinimap_Patch.ErzwingeRedraw = true;
+
+                        ServerLetzteZiele.Remove(poi.id); // Aufräumen
+                        continue;
                     }
-                    continue;
+
+                    // Es gibt einen aktiven Raum! Koordinate ermitteln
+                    Vector3 zielMitte = new Vector3(naechsterAktiverRaum.Center.x, naechsterAktiverRaum.Center.y, naechsterAktiverRaum.Center.z);
+
+                    // Hat sich das Ziel für diesen POI geändert? (Oder ist es ganz neu?)
+                    if (!ServerLetzteZiele.TryGetValue(poi.id, out Vector3 letztesZiel) || letztesZiel != zielMitte)
+                    {
+                        ServerLetzteZiele[poi.id] = zielMitte;
+
+                        // Den Host selbst müssen wir nicht per Netzwerk informieren, wir schreiben es ihm direkt ins Client-Gedächtnis
+                        ClientZiele[poi.id] = zielMitte;
+
+                        // Info an alle Clients schicken
+                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiRadarUpdate>().Setup(poi.id, zielMitte));
+                    }
                 }
 
-                // POI braucht einen Marker! ID in unser aktuelles Gedächtnis aufnehmen.
+                // =========================================================
+                // 3. MARKER ZEICHNEN (CLIENT & HOST)
+                // =========================================================
                 aktuellePoiIds.Add(poi.id);
-
-                Vector3 poiPos = new Vector3(poi.boundingBoxPosition.x, poi.boundingBoxPosition.y, poi.boundingBoxPosition.z);
-                float distSq = (playerPos - poiPos).sqrMagnitude;
-
-                string benoetigteKlasse;
-                Vector3 markerPos;
 
                 Vector3 centerPoiPos = new Vector3(
                     poi.boundingBoxPosition.x + (poi.boundingBoxSize.x / 2f),
@@ -189,94 +203,90 @@ public class PoiRadarManager : MonoBehaviour
                     poi.boundingBoxPosition.z + (poi.boundingBoxSize.z / 2f)
                 );
 
-                if (distSq > NahbereichDistanzSq)
+                Bounds poiBounds = new Bounds(centerPoiPos, new Vector3(poi.boundingBoxSize.x, poi.boundingBoxSize.y, poi.boundingBoxSize.z));
+                bool isInside = poiBounds.Contains(playerPos);
+
+                string benoetigteKlasse;
+                Vector3 markerPos;
+
+                if (!isInside)
                 {
-                    // Fall A (Weit weg): Haus-Symbol
+                    // Fall A (Draußen): Haus-Symbol 
                     benoetigteKlasse = "es_poi_global";
                     markerPos = centerPoiPos;
                 }
                 else
                 {
-                    // Fall B (Nahbereich): Roter Punkt im Raum
+                    // Fall B (Drinnen): Roter Punkt
                     benoetigteKlasse = "es_poi_local";
-                    SleeperVolume zielRaum = null;
-                    foreach (SleeperVolume volume in poi.sleeperVolumes)
-                    {
-                        if (!volume.wasCleared)
-                        {
-                            zielRaum = volume;
-                            break;
-                        }
-                    }
 
-                    if (zielRaum != null)
+                    // Wir bedienen uns einfach an den Koordinaten, die uns der Server per NetPackage gefunkt hat!
+                    if (ClientZiele.TryGetValue(poi.id, out Vector3 empfangenesZiel))
                     {
-                        // Koordinaten des Raums für den Marker verwenden
-                        markerPos = new Vector3(zielRaum.Center.x, zielRaum.Center.y, zielRaum.Center.z);
+                        markerPos = empfangenesZiel;
                     }
                     else
                     {
-                        markerPos = centerPoiPos; // Fallback
+                        // Falls das Netzwerkpaket noch eine Millisekunde braucht, kurzer Fallback auf die Hausmitte
+                        markerPos = centerPoiPos;
                     }
                 }
 
-                // -------------------------------------------------------------
-                // FLACKER-SCHUTZ: Abgleich mit dem Dictionary
-                // -------------------------------------------------------------
+                // FLACKER-SCHUTZ & NULL-CHECK
                 if (aktiveMarker.TryGetValue(poi.id, out NavObject alterMarker))
                 {
-                    // Hat der Spieler die 48m-Grenze überschritten? (Haus vs. Punkt)
-                    if (alterMarker.NavObjectClass.NavObjectClassName != benoetigteKlasse)
+                    // WICHTIG: Hat die 7DTD-Engine den Marker im Hintergrund gelöscht, weil wir zu weit weg waren?
+                    if (alterMarker == null || alterMarker.NavObjectClass == null)
                     {
-                        // Klasse hat gewechselt: Alten löschen, neuen zeichnen
+                        aktiveMarker.Remove(poi.id);
+                        NavObject neuerMarker = NavObjectManager.Instance.RegisterNavObject(benoetigteKlasse, markerPos, "", false);
+                        if (neuerMarker != null) aktiveMarker[poi.id] = neuerMarker;
+                    }
+                    else if (alterMarker.NavObjectClass.NavObjectClassName != benoetigteKlasse)
+                    {
                         NavObjectManager.Instance.UnRegisterNavObject(alterMarker);
                         NavObject neuerMarker = NavObjectManager.Instance.RegisterNavObject(benoetigteKlasse, markerPos, "", false);
                         if (neuerMarker != null) aktiveMarker[poi.id] = neuerMarker;
                     }
                     else
                     {
-                        // Klasse ist gleich geblieben! Einfach nur die Position im Hintergrund updaten.
-                        // Das Symbol bleibt statisch auf der UI und flackert nicht!
                         alterMarker.TrackedPosition = markerPos;
                     }
                 }
                 else
                 {
-                    // Komplett neuer POI im Radar
                     NavObject neuerMarker = NavObjectManager.Instance.RegisterNavObject(benoetigteKlasse, markerPos, "", false);
                     if (neuerMarker != null) aktiveMarker.Add(poi.id, neuerMarker);
                 }
             }
 
-            // =========================================================
-            // DAS AUFRÄUMEN: Alte Marker entfernen
-            // =========================================================
+            // AUFRÄUMEN
             List<int> zuLoeschen = new List<int>();
             foreach (var kvp in aktiveMarker)
             {
-                // Wenn die ID nicht in der neuen Liste ist, sind wir zu weit weg oder das POI wurde gecleart
                 if (!aktuellePoiIds.Contains(kvp.Key))
                 {
-                    NavObjectManager.Instance.UnRegisterNavObject(kvp.Value); // Von der Map löschen
-                    zuLoeschen.Add(kvp.Key); // Zum Entfernen aus dem Dictionary vormerken
+                    NavObjectManager.Instance.UnRegisterNavObject(kvp.Value);
+                    zuLoeschen.Add(kvp.Key);
                 }
             }
 
-            // Dictionary bereinigen
             foreach (int id in zuLoeschen)
             {
                 aktiveMarker.Remove(id);
+                ClientZiele.Remove(id); // Speicher-Leck verhindern
             }
         }
 
         void OnDestroy()
         {
-            // Beim Beenden des Spiels das Dictionary sauber leeren
             foreach (var kvp in aktiveMarker)
             {
                 NavObjectManager.Instance.UnRegisterNavObject(kvp.Value);
             }
             aktiveMarker.Clear();
+            ClientZiele.Clear();
+            ServerLetzteZiele.Clear();
         }
     }
 }
