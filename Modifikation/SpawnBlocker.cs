@@ -13,16 +13,24 @@ namespace EinmaligerSpawn.SpawnBlocker
     {
         // Server: Wenn der Chunk als Spawnort für einen normalen Zombie gepickt wurde prüfen wir, ob der Chunk bereits "ausgerottet" ist
         [HarmonyPostfix]
-        public static void Postfix(ref bool __result, ref Chunk _chunk)
+        public static void Postfix(ref bool __result, int _minDistance, ref Chunk _chunk)
         {
             // Server-only. Client rauswerfen
             if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+
+            // VANILLA-TRICK: _minDistance ist 28 für Feinde und 48 für Tiere.
+            // Ist der Wert über 30, wissen wir: Die Engine sucht gerade Platz für ein Tier!
+            if (_minDistance > 30)
+            {
+                return; // Wir lassen die Methode unangetastet, Tiere dürfen hier spawnen.
+            }
 
             if (__result && _chunk != null)
             {
                 Vector3i chunkPos = _chunk.GetWorldPos();
                 if (KillCounter.IstChunkAusgerottet(chunkPos, DynamischesSpawnLimit.MaxKills))
                 {
+                    // VETO! Wir sabotieren die Koordinaten-Suche für Zombies.
                     __result = false;
                 }
             }
@@ -42,6 +50,8 @@ namespace EinmaligerSpawn.SpawnBlocker
             // Server-only. Client rauswerfen
             if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
 
+            // Diese Methode wird AUSSCHLIESSLICH vom AIDirector für Horden aufgerufen (immer Feinde).
+            // Wir brauchen hier also keinen Tier-Filter.
             if (__result)
             {
                 Vector3i spawnPos = new Vector3i(_position); // <-- HIER AUCH ANGEPASST

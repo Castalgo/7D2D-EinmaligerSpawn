@@ -110,7 +110,7 @@ namespace EinmaligerSpawn.PoiTracker
             if (decorator == null) return;
 
             List<PrefabInstance> allePois = new List<PrefabInstance>();
-            decorator.GetPOIPrefabs(allePois);
+            decorator.GetAllPrefabs(allePois);
 
             // Abbruch, falls die aktuelle Karte überhaupt keine POIs besitzt (z. B. in einer leeren Testwelt)
             if (allePois.Count == 0) return;
@@ -121,6 +121,12 @@ namespace EinmaligerSpawn.PoiTracker
 
             foreach (PrefabInstance poi in allePois)
             {
+                // Alle POIs ohne SleeperVolumes sind uninteressant, da sie keine Räume enthalten, die gecleart werden können.
+                if (poi.sleeperVolumes == null || poi.sleeperVolumes.Count == 0)
+                {
+                    continue;
+                }
+
                 // FOG OF WAR CHECK
                 if (player.ChunkObserver != null && player.ChunkObserver.mapDatabase != null)
                 {

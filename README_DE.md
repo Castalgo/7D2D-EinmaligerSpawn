@@ -16,6 +16,8 @@ Aktuell befindet sich das Projekt in der Alpha-Phase (es ist die erste spielbare
 
 **Wichtig für Multiplayer:** Diese Mod kommuniziert über eigene Netzwerkpakete und muss daher **sowohl auf dem Server als auch bei allen Clients** installiert sein. Die Mod unterstützt kein EAC, d. h. der Server muss EAC abgeschaltet haben.
 
+Tipp: Die Mod funktioniert prima mit [Advanced Minimap mod](https://www.nexusmods.com/7daystodie/mods/11073) zusammen.
+
 ---
 
 ## Der AutoSpawner
@@ -33,18 +35,18 @@ Du hast verschiedene Möglichkeiten, wie ein Chunk in der Mod als "ausgerottet" 
 2.  **Todesort (Taktischer Kill / Kiting)**
     Zusätzlich zum Ursprungsort belohnt dich die Mod, wenn du taktisch spielst. Ziehst (kitest) du einen Zombie in einen anderen, angrenzenden Chunk und tötest ihn dort, wird auch dieser Todesort-Chunk mitgesäubert. 
     *   *Standard:* Diese Funktion ist standardmäßig aktiviert (`TaktischerKillAktiv = true`). 
-    *   *Steuerung:* Du kannst den Taktik-Clear über die Konsole mit `esa tactical <on/off>` jederzeit umschalten.
+    *   *Steuerung:* Ist vom Host jderzeit ein- oder abschaltbar über die Weltkarte.
 3.  **Durchlaufen (Lokaler Chunk Clear)**
     Du musst nicht jeden Chunk freikämpfen. Wenn du dich einfach nur 4 Sekunden lang ununterbrochen in einem Chunk aufhältst, gilt dieser ebenfalls als gesichert.
     *   *Standard:* Diese Funktion ist standardmäßig eingeschaltet (`LokalerChunkClearAktiv = true`).
-    *   *Steuerung:* Möchtest du das Spiel härter machen, deaktiviere diese Mechanik über die Konsole mit `esa localclear <on/off>`.
+    *   *Steuerung:* Ist vom Host jderzeit ein- oder abschaltbar über die Weltkarte.
 
 ---
 
 ## Wichtige Hinweise zum Gameplay
 *   **Heat-Spawns:** Heat-Spawns (wie z. B. Screamer) müssen zwingend deaktiviert sein, weil sie die Spawnlogik der Mod umgehen.
 *   **Quests:** Einmal geclearte POIs sind nicht mehr als Quest verfügbar. Bei Grabequests spawnen keine Gegnerwellen mehr.
-*   **Blutmond:** Ein Blutmond ergibt spieltechnisch keinen Sinn und sollte deaktiviert sein, weil er den Grundsatzgedanken der Mod aushebelt.
+*   **Blutmond:** Ein Blutmond ergibt spieltechnisch keinen Sinn und sollte deaktiviert sein, weil er den Grundsatzgedanken der Mod aushebelt und nur in nicht geclearten Chunks spawnen kann.
 *   **Buff für neue Spieler:** Die Mod berücksichtigt euren Buff und verschont euch anfangs etwas.
 
 ---

@@ -10,6 +10,7 @@ namespace EinmaligerSpawn.Config
         public static float BuffUpdateIntervall = 2f;
         public static bool ChatNachrichtenAktiv = true;
         public static int GlobalesZombieLimit = 18;
+        public static bool GlobalScanAbgeschlossen = false;
         public static bool KartenOverlayAktiv = true;
         public static bool LokalerChunkClearAktiv = true;
         public static int ProgressBuffRadius = 120;
@@ -34,6 +35,7 @@ namespace EinmaligerSpawn.Config
                     {
                         BuffUpdateIntervall = config.BuffUpdateIntervall;
                         GlobalesZombieLimit = config.GlobalesZombieLimit;
+                        GlobalScanAbgeschlossen = config.GlobalScanAbgeschlossen;
                         LokalerChunkClearAktiv = config.LokalerChunkClearAktiv;
                         ProgressBuffRadius = config.ProgressBuffRadius;
                         SpawnCheckIntervall = config.SpawnCheckIntervall;
@@ -55,6 +57,7 @@ namespace EinmaligerSpawn.Config
                 // Standardwerte, falls noch keine Config existiert
                 BuffUpdateIntervall = 2f;
                 GlobalesZombieLimit = 18;
+                GlobalScanAbgeschlossen = false;
                 LokalerChunkClearAktiv = true;
                 ProgressBuffRadius = 120;
                 SpawnCheckIntervall = 5f;
@@ -96,6 +99,7 @@ namespace EinmaligerSpawn.Config
                     BuffUpdateIntervall = BuffUpdateIntervall,
                     ChatNachrichtenAktiv = ChatNachrichtenAktiv,
                     GlobalesZombieLimit = GlobalesZombieLimit,
+                    GlobalScanAbgeschlossen = GlobalScanAbgeschlossen,
                     KartenOverlayAktiv = KartenOverlayAktiv,
                     LokalerChunkClearAktiv = LokalerChunkClearAktiv,
                     ProgressBuffRadius = ProgressBuffRadius,
@@ -118,6 +122,7 @@ namespace EinmaligerSpawn.Config
             public float BuffUpdateIntervall { get; set; } = 2f;
             public bool ChatNachrichtenAktiv { get; set; } = true;
             public int GlobalesZombieLimit { get; set; } = 18;
+            public bool GlobalScanAbgeschlossen { get; set; } = false;
             public bool KartenOverlayAktiv { get; set; } = true;
             public bool LokalerChunkClearAktiv { get; set; } = true;
             public int ProgressBuffRadius { get; set; } = 120;

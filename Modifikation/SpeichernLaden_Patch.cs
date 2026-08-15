@@ -48,10 +48,8 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 {
                     KillCounter.Load(savePath);
                     PoiDatenbank.Load(savePath); // Neu hinzugefügt
+                    ModEinstellungen.Laden(savePath); // Einstellungen für diese Welt laden
                 }
-
-                // Einstellungen für diese Welt laden
-                ModEinstellungen.Laden(savePath);
             }
         }
     }
@@ -68,15 +66,17 @@ namespace EinmaligerSpawn.SaveLoadPatches
             // 1. NUR SERVER
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
-                // 1. Dynamisches Spawn-Limit zurücksetzen 
+                // 1.1Scanner sofort hart abbrechen, falls er noch läuft!
+                GlobalMapScanner.StoppeGlobalenScan();
+                // 1.2 Dynamisches Spawn-Limit zurücksetzen 
                 DynamischesSpawnLimit.IstInitialisiert = false;
-                // 2. Autospawner zurücksetzen (RAM Cache der gescannten Chunks)
+                // 1.3 Autospawner zurücksetzen (RAM Cache der gescannten Chunks)
                 AutoSpawner.Reset();
-                // 3. Spieler-Tracking (4-Sekunden-Clear) zurücksetzen
+                // 1.4 Spieler-Tracking (4-Sekunden-Clear) zurücksetzen
                 LokalenChunkSaeubern.Reset();
             }
 
-            // 4. Temporäres Zombie-Gedächtnis leeren (sicherheitshalber)
+            // 2. Temporäres Zombie-Gedächtnis leeren (sicherheitshalber)
             if (KillCounter.ZombieUrsprung != null)
             {
                 KillCounter.ZombieUrsprung.Clear();
@@ -84,13 +84,13 @@ namespace EinmaligerSpawn.SaveLoadPatches
             if (KillCounter.ToteZombiesProChunk != null)
                 KillCounter.ToteZombiesProChunk.Clear();
 
-            // 5. POI-Datenbank leeren
+            // 3. POI-Datenbank leeren
             if (PoiDatenbank.GecleartePOIs != null)
             {
                 PoiDatenbank.GecleartePOIs.Clear();
             }
 
-            // 6. Map-Tracker leeren (NEU)
+            // 4. Map-Tracker leeren (NEU)
             KartenOverlayManager.KartenOverlay.Reset();
         }
     }
@@ -111,6 +111,10 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 {
                     DynamischesSpawnLimit.IstInitialisiert = true;
                     DynamischesSpawnLimit.InitialisiereWerte();
+
+                    // START DES BACKGROUND-SCANNERS
+                    GlobalMapScanner.StarteGlobalenScan();
+
                     Log.Out("[EinmaligerSpawn] Late-Init: Spawns wurden für die Session initialisiert (Server).");
                 }
             }
@@ -123,10 +127,20 @@ namespace EinmaligerSpawn.SaveLoadPatches
             // Wir prüfen, ob der Spieler, der gerade gespawnt ist, WIRKLICH der lokale Spieler am PC ist
             if (localPlayer != null && localPlayer.entityId == _entityId)
             {
-                // 1. Karte basierend auf der lokalen Config aktualisieren
+                // 2.1 Einstellungen laden (nur, wenn es kein Server ist, denn der Server hat die Daten ja schon im RAM)
+                if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                {
+                    string savePath = GameIO.GetSaveGameDir();
+                    if (!string.IsNullOrEmpty(savePath))
+                    {
+                        ModEinstellungen.Laden(savePath);
+                    }
+                }
+
+                // 2.2 Karte basierend auf der lokalen Config aktualisieren
                 KartenOverlay.Wiederherstellen();
 
-                // 2. Lokalen Buff beim Spawnen aufräumen, falls deaktiviert
+                // 2.3 Lokalen Buff beim Spawnen aufräumen, falls deaktiviert
                 if (!ModEinstellungen.ZeigeLokalenFortschritt)
                 {
                     if (localPlayer.Buffs.HasBuff("buffEinmaligerSpawnProgress"))
@@ -136,7 +150,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 }
 
                 // =================================================================
-                // NEU: POI Radar Manager lokal an den Spieler hängen
+                // 2.4 POI Radar Manager lokal an den Spieler hängen
                 // =================================================================
                 if (localPlayer.gameObject.GetComponent<PoiRadarManager>() == null)
                 {
@@ -150,14 +164,14 @@ namespace EinmaligerSpawn.SaveLoadPatches
             // TEIL 3: Netzwerk-Sync für beigetretene Clients
             // =================================================================
 
-            // 1. Sicherheitscheck: Nur der Server darf Daten verschicken!
+            // 3.1. Sicherheitscheck: Nur der Server darf Daten verschicken!
             if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
 
-            // 2. Ist es überhaupt ein externer Mitspieler (Client)? 
+            // 3.2 Ist es überhaupt ein externer Mitspieler (Client)? 
             // (Wenn der Host selbst spawnt, ist _cInfo = null. Der Host hat die Daten ja eh schon im RAM)
             if (_cInfo == null) return;
 
-            // 3. Wir holen uns alle Chunk-Namen (Keys), die der Server in seinem Gedächtnis hat
+            // 3.3 Wir holen uns alle Chunk-Namen (Keys), die der Server in seinem Gedächtnis hat
             List<string> relevanteChunks = new List<string>();
             foreach (var kvp in KillCounter.ToteZombiesProChunk)
             {
