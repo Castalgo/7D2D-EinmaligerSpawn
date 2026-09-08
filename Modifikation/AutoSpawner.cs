@@ -12,6 +12,9 @@ namespace EinmaligerSpawn.ZombieSpawner
         private static Dictionary<int, float> playerSpawnTimers = new Dictionary<int, float>();
         private static Dictionary<int, bool> playerProtectionLost = new Dictionary<int, bool>();
 
+        // Speichert die letzte Fehlschlag-LogMeldung pro Spieler-ID, um Log-Spam zu verhindern
+        private static Dictionary<int, string> letzterFehlschlagLog = new Dictionary<int, string>();
+
         private static readonly int[] ScanRingPrioritaeten = { 2, 3, 4, 5, 1, 0 };
 
         public static void OnGameUpdate()
@@ -75,6 +78,13 @@ namespace EinmaligerSpawn.ZombieSpawner
                 if (!playerSpawnTimers.ContainsKey(pid))
                     playerSpawnTimers[pid] = 0f;
 
+                // Ist der Spieler tot? Falls ja, nichts spawnen: Timer zurücksetzen und abbrechen.
+                if (player.IsDead())
+                {
+                    playerSpawnTimers[pid] = 0f;
+                    continue;
+                }
+
                 playerSpawnTimers[pid] += passedTime;
 
                 // Basis-Wert
@@ -82,20 +92,25 @@ namespace EinmaligerSpawn.ZombieSpawner
 
                 // ABSOLUTER OVERRIDE: Ist der Spieler aktiv IN einer gestarteten Quest?
                 bool isInQuest = false;
-                if (player.QuestJournal != null)
+                if (player.QuestJournal != null && player.QuestJournal.quests != null)
                 {
-                    Quest aktiveQuest = player.QuestJournal.FindActiveQuest();
-
-                    // Quest da UND Ausrufezeichen bereits geklickt?
-                    if (aktiveQuest != null && aktiveQuest.RallyMarkerActivated)
+                    // Alle Quests iterieren, da FindActiveQuest() nur die im UI getrackte Quest liefert
+                    for (int q = 0; q < player.QuestJournal.quests.Count; q++)
                     {
-                        // Vanilla-Methode für die POI-Grenzen holen (inklusive der 5-Block-Toleranz)
-                        Rect questBounds = aktiveQuest.GetLocationRect();
+                        Quest quest = player.QuestJournal.quests[q];
 
-                        // Steht der Spieler physisch in diesem Bereich?
-                        if (questBounds != Rect.zero && questBounds.Contains(new Vector2(player.position.x, player.position.z)))
+                        // Quest da UND Ausrufezeichen bereits geklickt (läuft also aktiv am POI)?
+                        if (quest != null && quest.RallyMarkerActivated)
                         {
-                            isInQuest = true;
+                            // Vanilla-Methode für die POI-Grenzen holen (inkl. 5-Block-Toleranz)
+                            Rect questBounds = quest.GetLocationRect();
+
+                            // Steht der Spieler physisch in diesem Bereich?
+                            if (questBounds != Rect.zero && questBounds.Contains(new Vector2(player.position.x, player.position.z)))
+                            {
+                                isInQuest = true;
+                                break; // Treffer, Schutz aktivieren und Schleife abbrechen
+                            }
                         }
                     }
                 }
@@ -346,6 +361,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                     if (gespawnteZombies > 0)
                     {
                         Log.Out($"{logPrefix} {gespawnteZombies} Zombie(s) wurde(n) bei {targetCx},{targetCz} für '{player.EntityName}' gespawnt.");
+                        letzterFehlschlagLog.Remove(player.entityId); // RESET: Der nächste Fehlschlag wird wieder geloggt
                         return;
                     }
                 }
@@ -354,7 +370,15 @@ namespace EinmaligerSpawn.ZombieSpawner
             // Fehler-Reporting, falls kein Spawn durchgeführt werden konnte
             if (!irgeneinChunkGeladen)
             {
-                Log.Out($"{logPrefix} Konnte keinen Zombie für '{player.EntityName}' erzeugen, weil keine Chunks infrage kommen.");
+                //Log.Out($"{logPrefix} Konnte keinen Zombie für '{player.EntityName}' erzeugen, weil keine Chunks infrage kommen.");
+                string aktuelleFehlermeldung = $"{logPrefix} Konnte keinen Zombie für '{player.EntityName}' erzeugen, weil keine Chunks infrage kommen.";
+
+                // Prüfen, ob für diesen Spieler schon exakt dieselbe Meldung geloggt wurde
+                if (!letzterFehlschlagLog.ContainsKey(player.entityId) || letzterFehlschlagLog[player.entityId] != aktuelleFehlermeldung)
+                {
+                    Log.Out(aktuelleFehlermeldung);
+                    letzterFehlschlagLog[player.entityId] = aktuelleFehlermeldung;
+                }
             }
             else
             {
@@ -368,6 +392,7 @@ namespace EinmaligerSpawn.ZombieSpawner
 
             if (playerSpawnTimers != null) playerSpawnTimers.Clear();
             if (playerProtectionLost != null) playerProtectionLost.Clear();
+            if (letzterFehlschlagLog != null) letzterFehlschlagLog.Clear(); // RESET: Ram aufräumen
 
             Log.Out("[ES AutoSpawner] Interner Cache und Timer wurden erfolgreich für die neue Sitzung geleert.");
         }
@@ -629,7 +654,7 @@ namespace EinmaligerSpawn.ZombieSpawner
             {
                 int fehlendeChunks = erwarteteChunks - erfassteChunks;
 
-                Log.Warning($"[AutoSpawner] Map-Scan unvollständig! Es fehlen {fehlendeChunks} Chunks (Erfasst: {erfassteChunks} / {erwarteteChunks}). Pausiere Scan bis zum Neustart.");
+                Log.Warning($"[ES MapScanner] Map-Scan unvollständig! Es fehlen {fehlendeChunks} Chunks (Erfasst: {erfassteChunks} / {erwarteteChunks}). Pausiere Scan bis zum Neustart.");
                 yield break; // Abbruch
             }
             else 
@@ -642,7 +667,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                 ModEinstellungen.GlobalScanAbgeschlossen = true;
                 ModEinstellungen.Speichern();
 
-                Log.Out($"[AutoSpawner] Globaler Map-Scan erfolgreich! Alle {erfassteChunks} Chunks wurden fehlerfrei analysiert.");
+                Log.Out($"[ES MapScanner] Globaler Map-Scan erfolgreich! Alle {erfassteChunks} Chunks wurden fehlerfrei analysiert.");
                 yield break;
             }
         }

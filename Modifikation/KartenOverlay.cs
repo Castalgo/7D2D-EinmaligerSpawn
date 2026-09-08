@@ -132,12 +132,17 @@ namespace EinmaligerSpawn.KartenOverlayManager
         // Berechnet den globalen Fortschritt: Anzahl der gesperrten Chunks / Gesamtanzahl der Chunks
         public static (int gesperrt, int gesamt, string prozentString) BerechneGlobalenFortschritt()
         {
-            // Kartengröße der Welt auslesen (z.B. 6144)
-            int worldSize = GamePrefs.GetInt(EnumGamePrefs.WorldGenSize);
+            // +++ NEUE STATISCHE LOGIK EINFÜGEN +++
+            // Wir greifen auf die festen Welt-Metadaten der V3-Architektur zu, 
+            // exakt wie im GlobalMapScanner!
+            IChunkProvider chunkProvider = GameManager.Instance.World.ChunkCache.ChunkProvider;
+            GameUtils.WorldInfo worldInfo = ((ChunkProviderAbstract)chunkProvider).WorldInfo;
 
-            // Die Kantenlänge in Chunks + dein definierter Puffer von 2 Chunks (1 pro Seite)
-            int chunksProSeite = (worldSize / 16) + 2;
-            int y_Gesamt = chunksProSeite * chunksProSeite;
+            int weltGroesseX = worldInfo.WorldSize.x;
+            int weltGroesseZ = worldInfo.WorldSize.y; // y entspricht in 2D unserem Z
+
+            // Berechnung der erwarteten Chunks durch die physischen Map-Dimensionen
+            int y_Gesamt = (weltGroesseX / 16) * (weltGroesseZ / 16);
             int x_Gesperrt = 0;
 
             // Wir greifen über KillCounter auf das Dictionary zu

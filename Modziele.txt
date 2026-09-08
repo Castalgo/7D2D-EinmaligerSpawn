@@ -27,8 +27,6 @@ Ziele der Mod EinmaligerSpawn (Version 3.x.x)
 Idee für zukünftige Erweiterung
 ----------------------------------------------------------------
 - "easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen
-- Kill XP-Faktor einbauen???
-
 - Welteroberung: um unspawnbare Chunks bereinigen
 
-- bekannte Bugs: Zombies vor Queststart ausrotten im POI <-- gefixt?
+- Spiel beitreten: Freeze-Grund bestimmen und fixen

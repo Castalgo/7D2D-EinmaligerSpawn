@@ -1,50 +1,45 @@
-﻿using HarmonyLib;
-using EinmaligerSpawn.PoiTracker;
+﻿// Wie die POI-Spawns orgnaisiert sind:
+// Ebene 1: Das Gebäude (der POI): besitzt Liste mit sleeperVolumes
+// Ebene 2: Die einzelnen Räume (die SleeperVolumes): nutzt groupCountList als Spawnziel (wie lange er spawnen soll), nutzt numSpawned um Spawns zu zählen
+// gespawnte Zombies landen in respawnMap
+// wenn die respawnMap leer ist und numSpawned >= groupCountList ist, wird der Raum als "ausgerottet" markiert
+
+using HarmonyLib;
 
 namespace EinmaligerSpawn.SpawnBlocker
 {
     [HarmonyPatch(typeof(SleeperVolume), "Reset")]
-    public class POI_Sleeper_Kontrolle
+    public class SleeperVolume_Reset_Patch
     {
-        // 1. PREFIX: Läuft VOR der Vanilla-Methode
+        // 1. PREFIX: Läuft VOR dem Vanilla-Reset
         [HarmonyPrefix]
-        public static bool Prefix(SleeperVolume __instance, out int __state)
+        public static void Prefix(SleeperVolume __instance, out int __state)
         {
-            // Wir sichern den aktuellen Fortschritt in der __state Variable
-            __state = __instance.numSpawned;
+            // Vanilla-Werte auslesen
+            int gespawnt = __instance.numSpawned;
+            int nochAmLeben = __instance.respawnMap != null ? __instance.respawnMap.Count : 0;
 
-            // Gehört das Volume zu einem gültigen POI?
-            if (__instance.prefabInstance != null)
-            {
-                // Ist das komplette Gebäude laut Datenbank tot?
-                if (PoiDatenbank.IstGecleart(__instance.prefabInstance.id))
-                {
-                    return false; // Reset hart blockieren. POI bleibt leer.
-                }
-            }
+            // Echte Kills berechnen
+            int echteKills = gespawnt - nochAmLeben;
 
-            // Ist dieser spezifische Raum bereits zu 100% gesäubert?
-            if (__instance.wasCleared)
-            {
-                return false; // Reset hart blockieren. Raum bleibt leer.
-            }
+            // Sicherheits-Check: Falls Vanilla-Bugs auftreten, gehen wir nicht ins Minus
+            if (echteKills < 0) echteKills = 0;
 
-            // FÜR ALLE ANDEREN RÄUME (auch die verklemmten): 
-            // Wir lassen den Reset zu, damit sich die Engine entbuggen kann!
-            return true;
+            // Den berechneten Kill-Wert für den Postfix zwischenspeichern
+            __state = echteKills;
         }
 
-        // 2. POSTFIX: Läuft direkt NACH der Vanilla-Methode
+        // 2. POSTFIX: Läuft direkt NACH dem Vanilla-Reset
         [HarmonyPostfix]
         public static void Postfix(SleeperVolume __instance, int __state)
         {
-            // Vanilla hat den Raum jetzt erfolgreich repariert und resettet.
-            // Dabei hat Vanilla aber auch numSpawned auf 0 gesetzt.
+            // Vanilla hat den Raum jetzt komplett resettet.
+            // numSpawned ist 0 und die respawnMap ist leer.
 
-            // Wenn in diesem Raum vorher schon Zombies gespawnt waren...
             if (__state > 0)
             {
-                // ... überschreiben wir die 0 einfach wieder mit unserem gesicherten Wert!
+                // Wir unterschieben der Engine unsere ausgerechneten Kills.
+                // Vanilla denkt nun, es hätte diesen Teil der Arbeit bereits erledigt.
                 __instance.numSpawned = __state;
             }
         }

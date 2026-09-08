@@ -1,7 +1,7 @@
 <configs>
 	<append xpath="/nav_object_classes">
 
-		<!-- Globaler Marker (> 48m): Mitte des POIs. Icon: Haus -->
+		<!-- 1. Globaler Marker (> 48m): Oranges Haus (Nur auf 2D-Karte und Kompass) -->
 		<nav_object_class name="es_poi_global">
 			<map_settings>
 				<property name="sprite_name" value="ui_game_symbol_map_house"/>
@@ -12,24 +12,48 @@
 			</map_settings>
 		</nav_object_class>
 
-		<!-- Lokaler Marker (<= 48m): Konkreter Raum. Icon: Roter Punkt -->
-		<nav_object_class name="es_poi_local">
+		<!-- 2. Reiner 2D-Karten-Marker für drinnen: ROT -->
+		<nav_object_class name="es_poi_map_only">
 			<map_settings>
 				<property name="sprite_name" value="ui_game_symbol_enemy_dot"/>
+				<!-- Rot auf der 2D-Karte -->
 				<property name="color" value="255,0,0,255"/>
-				<property name="min_distance" value="0"/>
-				<property name="max_distance" value="-1"/>
+			</map_settings>
+		</nav_object_class>
+
+		<!-- 3. Lokaler Endspurt-Marker: Karte = Rot | Kompass & 3D-Welt = Orange -->
+		<nav_object_class name="es_poi_local">
+			
+			<map_settings>
+				<property name="sprite_name" value="ui_game_symbol_enemy_dot"/>
+				<!-- Rot auf der 2D-Karte -->
+				<property name="color" value="255,0,0,255"/>
 				<property name="has_pulse" value="true"/>
 			</map_settings>
-
-			<!-- Kompassanzeige, falls man es immer sehen will
+			
 			<compass_settings>
 				<property name="sprite_name" value="ui_game_symbol_enemy_dot"/>
-				<property name="color" value="255,0,0,255"/>
+				<!-- Pfeile für Stockwerk-Abweichungen (Höhe) -->
+				<property name="up_sprite_name" value="ui_game_symbol_enemy_dot_up"/>
+				<property name="down_sprite_name" value="ui_game_symbol_enemy_dot_down"/>
+				<!-- Orange auf dem Kompass -->
+				<property name="color" value="255,180,0,255"/>
+				<property name="depth" value="4"/>
+				<property name="icon_clamped" value="true" />
+			</compass_settings>
+			
+			<onscreen_settings>
+				<property name="sprite_name" value="ui_game_symbol_enemy_dot"/>
+				<!-- Orange schwebend im 3D-Raum -->
+				<property name="color" value="255,180,0,255"/>
 				<property name="min_distance" value="0"/>
 				<property name="max_distance" value="-1"/>
 				<property name="has_pulse" value="true"/>
-			</compass_settings>-->
+				<!-- Zeigt die Distanz in Metern an -->
+				<property name="text_type" value="Distance"/>
+				<property name="offset" value="0,0,0" />
+			</onscreen_settings>
+			
 		</nav_object_class>
 
 	</append>

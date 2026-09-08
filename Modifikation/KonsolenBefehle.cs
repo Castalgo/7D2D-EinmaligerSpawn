@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Linq;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.LocalClear;
+using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.Network;
 using EinmaligerSpawn.PoiTracker;
 using EinmaligerSpawn.ZombieSpawner;
@@ -323,6 +325,7 @@ namespace EinmaligerSpawn.Commands
             "Nutze 'esa limit <Zahl>' um das globale Autospawn-Limit für Zombies auf dem Server festzulegen.\n" +
             "Nutze 'esa localclear <on/off/reason [name]>' für den autom. 4s-Clear (on/off) oder zur Fehlerdiagnose (reason).\n" +
             "Nutze 'esa range [Spieler] [radius]' um den geclearten Bereich um einen Spieler zu berechnen.\n" +
+            "Nutze 'esa scanreset [hard]' um den Map-Scan neu zu starten. 'hard' löscht zusätzlich alle 0-Einträge aus der Datenbank.\n" +
             "Nutze 'esa tactical <on/off>' um den serverseitigen Bonus-Clear (Taktischer Kill) ein- oder auszuschalten.\n" +
             "Nutze 'esa timer <Sekunden>' um das serverseitige Autospawn-Überprüfungsintervall anzupassen.";
 
@@ -369,6 +372,9 @@ namespace EinmaligerSpawn.Commands
                     break;
                 case "range":
                     CmdRangeAdmin(_params, _senderInfo);
+                    break;
+                case "scanreset":
+                    CmdScanReset(_params, _senderInfo);
                     break;
                 case "tactical":
                 case "taktik":
@@ -483,7 +489,7 @@ namespace EinmaligerSpawn.Commands
             foreach (PrefabInstance poi in allPois)
             {
                 // Ignoriere Gebäude, die wir bereits endgültig gecleart haben
-                if (PoiDatenbank.IstGecleart(poi.id)) continue;
+                if (PoiDatenbank.IstKomplettGecleart(poi.id)) continue;
                 if (poi.sleeperVolumes == null || poi.sleeperVolumes.Count == 0) continue;
 
                 // Überprüfen, ob es laut Vanilla noch aktive Räume gibt
@@ -704,6 +710,8 @@ namespace EinmaligerSpawn.Commands
 
             string actionText = isReset ? "reaktiviert (Reset)" : "neu ausgerottet (Clear)";
             SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa range] Ich habe {totalChecked} Chunks im Umkreis von {targetPlayer.EntityName} geprüft und {newlyModified} {actionText}.");
+
+            SimpleMinimap_Patch.ErzwingeRedraw = true;
         }
 
         /// Legt das globale Autospawn-Limit für Zombies auf dem Server fest.
@@ -894,6 +902,73 @@ namespace EinmaligerSpawn.Commands
                     GeneratedTextManager.BbCodeSupportMode.Supported
                 );
             }
+        }
+
+        /// Setzt den globalen Map-Scan hart auf False zurück und startet ihn neu.
+        /// Aufruf: esa scanreset [hard]
+        private void CmdScanReset(List<string> _params, CommandSenderInfo _senderInfo)
+        {
+            // Prüfen, ob der optionale Parameter "hard" mitgegeben wurde
+            bool isHard = _params.Count > 1 && _params[1].ToLower() == "hard";
+
+            // 1. Variable auf False setzen und sofort speichern
+            ModEinstellungen.GlobalScanAbgeschlossen = false;
+            ModEinstellungen.Speichern();
+
+            // 2. SICHERHEIT: Falls gerade ein Scan läuft, würgen wir ihn hart ab
+            GlobalMapScanner.StoppeGlobalenScan();
+
+            string extraMsg = "";
+
+            // 3. HARD-Modus: Alle 0-Einträge aus dem KillCounter löschen
+            if (isHard)
+            {
+                int geloeschteChunks = KillCounter.Debug_EntferneNullEintraege();
+
+                // Sofortiges Speichern der bereinigten Datenbank
+                string saveDir = GameIO.GetSaveGameDir();
+                if (!string.IsNullOrEmpty(saveDir))
+                {
+                    KillCounter.Save(saveDir);
+                }
+
+                extraMsg = $" (Hard-Mode: {geloeschteChunks} Chunks mit 0 Kills gelöscht)";
+            }
+            else
+            {
+                // STANDARD-Modus: Nur die 0-Einträge löschen, die aktuell im RAM liegen
+                int localDeleted = 0;
+
+                // 'var' schnappt sich automatisch die LinkedList<Chunk> von der Engine
+                var geladeneChunks = GameManager.Instance.World.ChunkCache.GetChunkArray();
+
+                if (geladeneChunks != null)
+                {
+                    foreach (Chunk chunk in geladeneChunks)
+                    {
+                        if (chunk == null) continue;
+
+                        string chunkId = $"{chunk.X}_{chunk.Z}";
+
+                        // Nur löschen, wenn er existiert und auf 0 steht
+                        if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills) && kills == 0)
+                        {
+                            KillCounter.ToteZombiesProChunk.Remove(chunkId);
+                            localDeleted++;
+                        }
+                    }
+                }
+
+                extraMsg = $" (Lokal: {localDeleted} geladene RAM-Chunks werden neu evaluiert)";
+            }
+
+            // 4. Den Scanner-Thread komplett neu starten
+            GlobalMapScanner.StarteGlobalenScan();
+
+            // 5. Kurzes Feedback an die Konsole und die Log-Datei
+            string msg = $"[ESa scanreset] Der globale Map-Scan wurde auf 'False' gesetzt und sofort neu gestartet.{extraMsg}";
+            SingletonMonoBehaviour<SdtdConsole>.Instance.Output(msg);
+            Log.Out(msg);
         }
 
         /// Schaltet den serverseitigen Bonus-Clear (Taktischer Kill) ein oder aus.

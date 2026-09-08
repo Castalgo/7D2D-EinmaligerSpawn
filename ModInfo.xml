@@ -2,9 +2,9 @@
 <ModInfo>
   <Name value="EinmaligerSpawn" />
   <DisplayName value="Einmaliger Spawn – Keine Respawns" />
-  <Description value="Gegner spawnen beim erstmaligen betreten und danach nie wieder. Händler sind mit einer Quest auf Maximum und bei Grabequests spawnen keine Gegner mehr. Die Spawnmenge wurde verdoppelt und auf Ödlandniveau angehoben." />
+  <Description value="Gegner spawnen nach dem Töten nicht mehr im gleichen Chunk, wodurch eine Ausrottung möglich wird. Auch POIs können nicht respawnen. Grabequests spawnen keine Gegner mehr. Die Spawnmenge wurde verdoppelt und auf Ödlandniveau angehoben." />
   <Author value="Castalgo" />
-  <Version value="0.0.16" />
+  <Version value="0.0.19" />
   <Website value="" />
   <LoadAfter value="SimpleMinimapUAV" />
 </ModInfo>

@@ -199,5 +199,22 @@ namespace EinmaligerSpawn.ChunkDatenbank
             float prozent = gesamtChunks > 0 ? (float)Math.Round(((float)gesperrteChunks / gesamtChunks) * 100f, 1) : 0f;
             return (gesamtChunks, gesperrteChunks, prozent);
         }
+
+        // Entfernt alle Einträge mit 0 Kills aus der Datenbank
+        public static int Debug_EntferneNullEintraege()
+        {
+            // Sammelt alle Chunk-IDs, deren Kill-Zahl 0 ist
+            var zuLoeschendeKeys = ToteZombiesProChunk
+                .Where(kvp => kvp.Value == 0)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var key in zuLoeschendeKeys)
+            {
+                ToteZombiesProChunk.Remove(key);
+            }
+
+            return zuLoeschendeKeys.Count;
+        }
     }
 }

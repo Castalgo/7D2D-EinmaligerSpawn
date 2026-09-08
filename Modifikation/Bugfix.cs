@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using EinmaligerSpawn.ChunkDatenbank;
+using EinmaligerSpawn.PoiTracker;
 using HarmonyLib;
 using UnityEngine;
 
@@ -64,6 +65,56 @@ namespace EinmaligerSpawn.BugFixes
                     }
                 }
             }
+        }
+    }
+}
+
+namespace EinmaligerSpawn.Logging
+{
+    // =========================================================================================
+    // QUEST-START LOGGING
+    // Loggt den Moment, in dem ein Spieler eine Quest am Rally Marker startet
+    // =========================================================================================
+    [HarmonyPatch(typeof(ObjectiveRallyPoint), "RallyPointActivate")]
+    public class Quest_RallyMarker_Start_Patch
+    {
+        [HarmonyPostfix]
+        public static void Postfix(ObjectiveRallyPoint __instance, bool activate)
+        {
+            // Die Engine übergibt 'activate = false', falls die Quest blockiert ist (z. B. durch Bedrolls).
+            // Wir loggen nur erfolgreiche Starts.
+            if (!activate) return;
+
+            // Die übergeordnete Quest des Rally-Markers abrufen
+            Quest ownerQuest = __instance.OwnerQuest;
+            if (ownerQuest == null || ownerQuest.OwnerJournal == null || ownerQuest.OwnerJournal.OwnerPlayer == null) return;
+
+            EntityPlayer starter = ownerQuest.OwnerJournal.OwnerPlayer;
+
+            // Gebäudedaten auslesen
+            string poiName = "Unbekannter POI";
+            if (ownerQuest.QuestClass != null)
+            {
+                poiName = ownerQuest.QuestClass.Name;
+            }
+
+            // Party-Mitglieder ermitteln
+            string partyMembers = "Keine (Solo)";
+            if (starter.Party != null && starter.Party.MemberList != null && starter.Party.MemberList.Count > 1)
+            {
+                List<string> memberNames = new List<string>();
+                foreach (EntityPlayer member in starter.Party.MemberList)
+                {
+                    if (member.entityId != starter.entityId)
+                    {
+                        memberNames.Add(member.EntityName);
+                    }
+                }
+                partyMembers = string.Join(", ", memberNames);
+            }
+
+            // Die finale Ausgabe in die Server-Konsole
+            Log.Out($"[ES Debug Queststart] Spieler '{starter.EntityName}' hat die Quest '{poiName}' (Code: {ownerQuest.QuestCode}) am Marker gestartet. Aktive Party-Mitglieder: {partyMembers}");
         }
     }
 }

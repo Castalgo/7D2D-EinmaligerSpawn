@@ -44,7 +44,7 @@ namespace EinmaligerSpawn.SpawnBlocker
             if (__instance is EntityEnemy || __instance is EntityZombie)
             {
                 // =========================================================
-                // TEIL 1: POI-CLEAR PRÜFUNG (Neu mit Verzögerung)
+                // TEIL 1: POI-CLEAR PRÜFUNG (mit Verzögerung)
                 // =========================================================
                 PrefabInstance poi = GameManager.Instance.World.GetPOIAtPosition(__instance.position);
                 if (poi != null && poi.sleeperVolumes != null && poi.sleeperVolumes.Count > 0)
@@ -54,7 +54,7 @@ namespace EinmaligerSpawn.SpawnBlocker
                 }
 
                 // =========================================================
-                // TEIL 2: CHUNK-CLEAR PRÜFUNG (Dein bisheriger Code)
+                // TEIL 2: CHUNK-CLEAR PRÜFUNG
                 // =========================================================
 
                 // Abbruch, wenn der taktische Kill in der Config deaktiviert ist
@@ -195,7 +195,7 @@ namespace EinmaligerSpawn.SpawnBlocker
             yield return new WaitForSeconds(1.0f);
 
             // Abbruch, falls das Gebäude in der Zwischenzeit durch einen anderen Kill-Thread bereits gesichert wurde
-            if (PoiDatenbank.IstGecleart(poi.id)) yield break;
+            if (PoiDatenbank.IstKomplettGecleart(poi.id)) yield break;
 
             bool istKomplettLeer = true;
             foreach (SleeperVolume volumen in poi.sleeperVolumes)
@@ -209,7 +209,7 @@ namespace EinmaligerSpawn.SpawnBlocker
 
             if (istKomplettLeer)
             {
-                PoiDatenbank.SetzeGecleart(poi.id);
+                PoiDatenbank.SetzeStatus(poi.id, 1);
                 Log.Warning($"[EinmaligerSpawn] POI '{poi.name}' (ID: {poi.id}) wurde restlos gesäubert!");
 
                 // Chatnachricht im Einzelspieler und für den Host im Multiplayer

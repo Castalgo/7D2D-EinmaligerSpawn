@@ -8,32 +8,35 @@ namespace EinmaligerSpawn.SpawnBlocker
     // ---------------------------------------------------------
     // TEIL 1: Der Blocker für reguläre Biom-Zombies
     // ---------------------------------------------------------
-    [HarmonyPatch(typeof(World), "GetRandomSpawnPositionInAreaMinMaxToPlayers")]
-    public class World_GetRandomSpawnPosition_Patch
+    [HarmonyPatch(typeof(SpawnManagerBiomes), "SpawnUpdate")]
+    public class SpawnManagerBiomes_SpawnUpdate_Patch
     {
-        // Server: Wenn der Chunk als Spawnort für einen normalen Zombie gepickt wurde prüfen wir, ob der Chunk bereits "ausgerottet" ist
-        [HarmonyPostfix]
-        public static void Postfix(ref bool __result, int _minDistance, ref Chunk _chunk)
+        // Server: Wir klinken uns VOR dem eigentlichen Spawn-Update ein.
+        [HarmonyPrefix]
+        public static bool Prefix(string _spawnerName, bool _isSpawnEnemy, ChunkAreaBiomeSpawnData _spawnData)
         {
             // Server-only. Client rauswerfen
-            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+            if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return true;
 
-            // VANILLA-TRICK: _minDistance ist 28 für Feinde und 48 für Tiere.
-            // Ist der Wert über 30, wissen wir: Die Engine sucht gerade Platz für ein Tier!
-            if (_minDistance > 30)
+            // Sicherheitsprüfung, falls die Engine Müll übergibt
+            if (_spawnData == null || _spawnData.chunk == null) return true;
+
+            // TIER-FILTER: Wenn es ein friedliches Tier ist, lassen wir die Vanilla-Engine IMMER laufen!
+            if (!_isSpawnEnemy) return true;
+
+            // FEIND-FILTER: Wir ermitteln die Chunk-ID der Biom-Area.
+            Vector3i chunkPos = _spawnData.chunk.GetWorldPos();
+            string chunkId = KillCounter.GetChunkId(chunkPos);
+
+            // Ist dieser Chunk bereits in der Datenbank und als ausgerottet markiert?
+            if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
             {
-                return; // Wir lassen die Methode unangetastet, Tiere dürfen hier spawnen.
+                // VETO! Der Chunk ist ausgerottet. Die gesamte Spawn-Methode für Biom-Zombies wird hier abgebrochen.
+                return false;
             }
 
-            if (__result && _chunk != null)
-            {
-                Vector3i chunkPos = _chunk.GetWorldPos();
-                if (KillCounter.IstChunkAusgerottet(chunkPos, DynamischesSpawnLimit.MaxKills))
-                {
-                    // VETO! Wir sabotieren die Koordinaten-Suche für Zombies.
-                    __result = false;
-                }
-            }
+            // Chunk ist noch nicht ausgerottet, Vanilla darf ganz normal nach Koordinaten suchen und spawnen
+            return true;
         }
     }
 
@@ -50,11 +53,10 @@ namespace EinmaligerSpawn.SpawnBlocker
             // Server-only. Client rauswerfen
             if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
 
-            // Diese Methode wird AUSSCHLIESSLICH vom AIDirector für Horden aufgerufen (immer Feinde).
-            // Wir brauchen hier also keinen Tier-Filter.
+            // Diese Methode wird meist vom AIDirector aufgerufen.
             if (__result)
             {
-                Vector3i spawnPos = new Vector3i(_position); // <-- HIER AUCH ANGEPASST
+                Vector3i spawnPos = new Vector3i(_position);
                 string chunkId = KillCounter.GetChunkId(spawnPos);
 
                 if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
@@ -120,9 +122,6 @@ namespace EinmaligerSpawn.SpawnBlocker
                 {
                     KillCounter.ZombieUrsprung.Remove(id);
                 }
-
-                // Optional: Deaktivieren, wenn es zu viel im Log spamt
-                // Log.Out($"[EinmaligerSpawn] Garbage Collection: {geisterIds.Count} despawnte Geister-Zombies aus dem Gedächtnis gelöscht.");
             }
         }
     }
