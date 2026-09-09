@@ -53,9 +53,9 @@ namespace EinmaligerSpawn.BugFixes
                                 volumeTraverse.Field("wasCleared").SetValue(false);
 
                                 // 5. Müllabfuhr in unserer Mod
-                                if (KillCounter.ZombieUrsprung.ContainsKey(__instance.entityId))
+                                if (ChunkClearManager.ZombieUrsprung.ContainsKey(__instance.entityId))
                                 {
-                                    KillCounter.ZombieUrsprung.Remove(__instance.entityId);
+                                    ChunkClearManager.ZombieUrsprung.Remove(__instance.entityId);
                                 }
 
                                 // Wir haben den Raum gefunden und repariert, Suche abbrechen!

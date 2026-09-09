@@ -23,7 +23,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 // nur der Server speichert die Kill-Datenbanken
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
-                    KillCounter.Save(savePath);
+                    ChunkClearManager.Save(savePath);
                     PoiDatenbank.Save(savePath); // Neu hinzugefügt
                 }
 
@@ -46,7 +46,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 // nur der Server lädt die Kill-Datenbanken
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
-                    KillCounter.Load(savePath);
+                    ChunkClearManager.Load(savePath);
                     PoiDatenbank.Load(savePath);
                     ModEinstellungen.Laden(savePath); // Einstellungen für diese Welt laden
                 }
@@ -77,12 +77,12 @@ namespace EinmaligerSpawn.SaveLoadPatches
             }
 
             // 2. Temporäres Zombie-Gedächtnis leeren (sicherheitshalber)
-            if (KillCounter.ZombieUrsprung != null)
+            if (ChunkClearManager.ZombieUrsprung != null)
             {
-                KillCounter.ZombieUrsprung.Clear();
+                ChunkClearManager.ZombieUrsprung.Clear();
             }
-            if (KillCounter.ToteZombiesProChunk != null)
-                KillCounter.ToteZombiesProChunk.Clear();
+            if (ChunkClearManager.ChunkClearLevel != null)
+                ChunkClearManager.ChunkClearLevel.Clear();
 
             // 3. POI-Datenbank leeren
             if (PoiDatenbank.PoiZustaende != null)
@@ -120,7 +120,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
             {
                 // Chunk-Gedächtnis zusammenstellen
                 List<string> relevanteChunks = new List<string>();
-                foreach (var kvp in KillCounter.ToteZombiesProChunk)
+                foreach (var kvp in ChunkClearManager.ChunkClearLevel)
                 {
                     if (kvp.Value >= 1)
                     {

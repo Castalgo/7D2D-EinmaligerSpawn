@@ -42,7 +42,7 @@ namespace EinmaligerSpawn.HUD
             int playerChunkZ = pos.z >> 4;
 
             // 6. Prozentwert berechnen (mit dem flexiblen Radius aus der Config)
-            var fortschritt = KillCounter.BerechneLokalenFortschritt(playerChunkX, playerChunkZ, ModEinstellungen.ProgressBuffRadius);
+            var fortschritt = ChunkClearManager.BerechneLokalenFortschritt(playerChunkX, playerChunkZ, ModEinstellungen.ProgressBuffRadius);
 
             // 7. Den Wert ins HUD schreiben
             player.Buffs.SetCustomVar("esLocalClearPercent", fortschritt.prozent, true);

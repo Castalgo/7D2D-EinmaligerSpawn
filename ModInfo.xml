@@ -4,7 +4,7 @@
   <DisplayName value="Einmaliger Spawn – Keine Respawns" />
   <Description value="Gegner spawnen nach dem Töten nicht mehr im gleichen Chunk, wodurch eine Ausrottung möglich wird. Auch POIs können nicht respawnen. Grabequests spawnen keine Gegner mehr. Die Spawnmenge wurde verdoppelt und auf Ödlandniveau angehoben." />
   <Author value="Castalgo" />
-  <Version value="0.0.19" />
+  <Version value="0.0.20" />
   <Website value="" />
   <LoadAfter value="SimpleMinimapUAV" />
 </ModInfo>

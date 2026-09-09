@@ -223,11 +223,11 @@ namespace EinmaligerSpawn.ZombieSpawner
                     string chunkId = $"{targetCx}_{targetCz}";
 
                     // 1. Priorität: DB-Check
-                    if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
+                    if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId) && ChunkClearManager.ChunkClearLevel[chunkId] >= 1)
                         continue;
 
                     // 2. Priorität: Ist für diesen Chunk bereits ein Zombie aktiv?
-                    if (KillCounter.ZombieUrsprung.ContainsValue(chunkId))
+                    if (ChunkClearManager.ZombieUrsprung.ContainsValue(chunkId))
                         continue;
 
                     int minX = targetCx * 16;
@@ -304,6 +304,21 @@ namespace EinmaligerSpawn.ZombieSpawner
                             float flatDist = Vector2.Distance(flatPlayer, flatTarget);
 
                             // Wenn der Punkt zu nah am Hauptspieler ist, schieben wir ihn weg
+
+                            // =====================================================================
+                            // DOKUMENTATION: GEWOLLTES ÜBERTRITT-VERHALTEN IN GECLEARTE CHUNKS
+                            // =====================================================================
+                            // Wenn ein Zombie wegen der 28-Meter-Bannmeile in einen benachbarten 
+                            // Chunk verschoben werden muss, prüfen wir absichtlich NICHT, ob 
+                            // dieser Ziel-Chunk bereits gesäubert wurde! 
+                            // 
+                            // Grund (Anti-Softlock): Wenn der Spieler exakt an der Grenze eines
+                            // ungesäuberten Chunks steht und alle Nachbarchunks bereits gecleart
+                            // sind, könnte der ungesäuberte Chunk niemals seinen Zombie spawnen.
+                            // Um diesen Softlock zu verhindern, tolerieren wir den "Übertritt" in
+                            // sauberes Gebiet. (Die Vanilla-Engine verhält sich hierbei identisch).
+                            // =====================================================================
+
                             if (flatDist < 28f)
                             {
                                 Vector2 dir = (flatTarget - flatPlayer).normalized;
@@ -365,7 +380,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                             if (zombie != null)
                             {
                                 GameManager.Instance.World.SpawnEntityInWorld(zombie);
-                                KillCounter.ZombieUrsprung[zombie.entityId] = chunkId;
+                                ChunkClearManager.ZombieUrsprung[zombie.entityId] = chunkId;
                                 gespawnteZombies++;
                             }
                         }
@@ -377,7 +392,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                             // ==========================================
                             if (!zielVerschoben)
                             {
-                                KillCounter.ToteZombiesProChunk[chunkId] = 1;
+                                ChunkClearManager.ChunkClearLevel[chunkId] = 1;
                                 SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
                             }
                         }
@@ -501,7 +516,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                     string chunkId = $"{mathX}_{mathZ}";
 
                     // Bereits in der Datenbank? Überspringen!
-                    if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                    if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
                     {
                         continue;
                     }
@@ -510,7 +525,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                     if (!GlobalMapScanner.PruefeChunkMathematisch(mathX, mathZ, biomeProvider, overlappingPOIs))
                     {
                         // Der Mathe-Filter sagt: "Hier gibt es zu 100 % keinen Platz."
-                        KillCounter.ToteZombiesProChunk[chunkId] = 1;
+                        ChunkClearManager.ChunkClearLevel[chunkId] = 1;
                     }
 
                     mathChunksProcessed++;
@@ -543,19 +558,19 @@ namespace EinmaligerSpawn.ZombieSpawner
                 {
                     string chunkId = $"{cx}_{cz}";
 
-                    // Wenn er hier noch in der Datenbank ist, hat ihn Phase 1 oder ein alter Scan schon erledigt
-                    if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                    // Wenn er hier noch in der Datenbank ist, hat ihn Phase 1 oder ein alter Scan schon erledigt                 
+                    if (!ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId)) // Nur hinzufügen, wenn der Chunk noch fehlt.
                     {
-                        cz++;
-                        continue;
+                        chunkBatch.Add(new Vector2i(cx, cz));
+                        // Kein blockierendes "continue" mehr, weil sonst die letzten Chunks nicht geprüft werden würden
                     }
 
                     // ==========================================
                     // PHYSISCHE WACKELKANDIDATEN IN DEN BATCH
                     // ==========================================
-                    chunkBatch.Add(new Vector2i(cx, cz));
-
-                    // Wenn wir 20 Kandidaten gesammelt haben, werfen wir die Festplatte an
+                    // Die Ausführung erreicht diesen Punkt nun in JEDEM Durchlauf.
+                    // Wenn der allerletzte Chunk der Karte erreicht wird, greift die
+                    // Restpaket-Bedingung zuverlässig, selbst wenn dieser Chunk übersprungen wurde.
                     if (chunkBatch.Count >= 20 || (cx == maxChunkX && cz == maxChunkZ && chunkBatch.Count > 0))
                     {
                         while (GameManager.Instance.World.ChunkCache.Count() >= 5000)
@@ -672,7 +687,7 @@ namespace EinmaligerSpawn.ZombieSpawner
             int erwarteteChunks = (weltGroesseX / 16) * (weltGroesseZ / 16);
 
             // Die tatsächlich in deiner Datenbank hinterlegten Chunks
-            int erfassteChunks = KillCounter.ToteZombiesProChunk.Count; // (Oder wie dein Dictionary exakt heißt)
+            int erfassteChunks = ChunkClearManager.ChunkClearLevel.Count; // (Oder wie dein Dictionary exakt heißt)
 
             if (erfassteChunks < erwarteteChunks)
             {
@@ -772,8 +787,8 @@ namespace EinmaligerSpawn.ZombieSpawner
             BiomeDefinition biome = GameManager.Instance.World.Biomes.GetBiome(biomeId);
             if (biome == null || !BiomeSpawningClass.list.ContainsKey(biome.m_sBiomeName))
             {
-                if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
-                    KillCounter.ToteZombiesProChunk[chunkId] = 1;
+                if (!ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
+                    ChunkClearManager.ChunkClearLevel[chunkId] = 1;
 
                 SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
 
@@ -823,17 +838,17 @@ namespace EinmaligerSpawn.ZombieSpawner
             if (validSpawnFound)
             {
                 // Chunk in DB schreiben
-                if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                if (!ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
                 {
-                    KillCounter.ToteZombiesProChunk[chunkId] = 0;
+                    ChunkClearManager.ChunkClearLevel[chunkId] = 0;
                 }
 
                 return;
             }
             else
             {
-                if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
-                    KillCounter.ToteZombiesProChunk[chunkId] = 1;
+                if (!ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
+                    ChunkClearManager.ChunkClearLevel[chunkId] = 1;
 
                 SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
 

@@ -32,12 +32,12 @@ namespace EinmaligerSpawn.KartenOverlayManager
             bool needsRedraw = false;
 
             // 1. Bereinigung: Falls Chunks per Admin-Cheat 'reset' zurückgesetzt wurden
-            if (knownClearedChunks.Count > KillCounter.ToteZombiesProChunk.Count)
+            if (knownClearedChunks.Count > ChunkClearManager.ChunkClearLevel.Count)
             {
                 List<string> removed = new List<string>();
                 foreach (string key in knownClearedChunks)
                 {
-                    if (!KillCounter.ToteZombiesProChunk.ContainsKey(key) || KillCounter.ToteZombiesProChunk[key] < 1)
+                    if (!ChunkClearManager.ChunkClearLevel.ContainsKey(key) || ChunkClearManager.ChunkClearLevel[key] < 1)
                     {
                         removed.Add(key);
                     }
@@ -51,7 +51,7 @@ namespace EinmaligerSpawn.KartenOverlayManager
             }
 
             // 2. Suche nach NEUEN Chunks
-            foreach (var kvp in KillCounter.ToteZombiesProChunk)
+            foreach (var kvp in ChunkClearManager.ChunkClearLevel)
             {
                 if (kvp.Value >= 1 && !knownClearedChunks.Contains(kvp.Key))
                 {
@@ -145,8 +145,8 @@ namespace EinmaligerSpawn.KartenOverlayManager
             int y_Gesamt = (weltGroesseX / 16) * (weltGroesseZ / 16);
             int x_Gesperrt = 0;
 
-            // Wir greifen über KillCounter auf das Dictionary zu
-            foreach (var kvp in KillCounter.ToteZombiesProChunk)
+            // Wir greifen über ChunkClearManager auf das Dictionary zu
+            foreach (var kvp in ChunkClearManager.ChunkClearLevel)
             {
                 if (kvp.Value >= 1)
                 {
@@ -276,7 +276,7 @@ namespace EinmaligerSpawn.KartenOverlayManager
                     int chunkZ = World.toChunkXZ(zWelt);
                     string chunkId = $"{chunkX}_{chunkZ}";
 
-                    if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills) && kills >= 1)
+                    if (ChunkClearManager.ChunkClearLevel.TryGetValue(chunkId, out int kills) && kills >= 1)
                     {
                         // NEU: Ist dieser Chunk frisch gecleart (und soll gelb leuchten)?
                         bool isNeuGecleart = KartenOverlay.NeuGeclearteChunks.ContainsKey(chunkId);

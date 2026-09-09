@@ -10,7 +10,7 @@ using UnityEngine;
 namespace EinmaligerSpawn.Network
 {
     // Synchronisiert den Spawnbarkeits-Status einzelner Chunks vom Server zum Client, 
-    // damit die lokalen KillCounter-Listen der Spieler auf dem gleichen Stand bleiben.
+    // damit die lokalen ChunkClearManager-Listen der Spieler auf dem gleichen Stand bleiben.
     public class NetPackageChunkSync : NetPackage
     {
         private List<string> gesaeuberteChunks = new List<string>();
@@ -62,7 +62,7 @@ namespace EinmaligerSpawn.Network
                 baseWriter.Write(this.taktischerKillAktiv);
             }
 
-            baseWriter.Write((ushort)gesaeuberteChunks.Count);
+            baseWriter.Write(gesaeuberteChunks.Count);
             foreach (string chunkId in gesaeuberteChunks)
             {
                 baseWriter.Write(chunkId);
@@ -83,7 +83,7 @@ namespace EinmaligerSpawn.Network
                 this.taktischerKillAktiv = baseReader.ReadBoolean();
             }
 
-            ushort anzahl = baseReader.ReadUInt16();
+            int anzahl = baseReader.ReadInt32();
             gesaeuberteChunks.Clear();
             for (int i = 0; i < anzahl; i++)
             {
@@ -109,9 +109,9 @@ namespace EinmaligerSpawn.Network
             bool datenGeaendert = false;
             foreach (string chunkId in gesaeuberteChunks)
             {
-                if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                if (!ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
                 {
-                    KillCounter.ToteZombiesProChunk[chunkId] = 1;
+                    ChunkClearManager.ChunkClearLevel[chunkId] = 1;
                     datenGeaendert = true;
 
                     // LOKALE CHAT-NACHRICHT FÜR DEN SPIELER
@@ -144,7 +144,7 @@ namespace EinmaligerSpawn.Network
                 length += 10;
             }
 
-            length += 2 + (gesaeuberteChunks.Count * 10);
+            length += 4 + (gesaeuberteChunks.Count * 10);
             return length;
         }
     }
@@ -157,6 +157,7 @@ namespace EinmaligerSpawn.Network
         private Dictionary<int, byte> syncPois = new Dictionary<int, byte>();
         private bool isLoginSync = false;
 
+        // Konstruktor
         public NetPackagePoiSync() { }
 
         public NetPackagePoiSync SetupForLogin(List<int> allePois)
@@ -191,7 +192,7 @@ namespace EinmaligerSpawn.Network
             System.IO.BinaryWriter baseWriter = _writer;
             baseWriter.Write(this.isLoginSync);
 
-            baseWriter.Write((ushort)syncPois.Count);
+            baseWriter.Write(syncPois.Count);
             foreach (var kvp in syncPois)
             {
                 baseWriter.Write(kvp.Key);   // 4 Bytes (Int32)
@@ -205,7 +206,7 @@ namespace EinmaligerSpawn.Network
 
             this.isLoginSync = baseReader.ReadBoolean();
 
-            ushort anzahl = baseReader.ReadUInt16();
+            int anzahl = baseReader.ReadInt32();
             this.syncPois.Clear();
 
             for (int i = 0; i < anzahl; i++)
@@ -254,8 +255,8 @@ namespace EinmaligerSpawn.Network
 
         public override int GetLength()
         {
-            // 1 (bool) + 2 (ushort) + (Anzahl * 5 Bytes pro Eintrag)
-            return 1 + 2 + (syncPois.Count * 5);
+            // 1 (bool) + 4 (int) + (Anzahl * 5 Bytes pro Eintrag)
+            return 1 + 4 + (syncPois.Count * 5);
         }
     }
 
@@ -372,9 +373,51 @@ namespace EinmaligerSpawn.Network
             {
                 if (PoiDatenbank.LeseStatus(this.poiId) == 0)
                 {
-                    PoiDatenbank.SetzeStatus(this.poiId, 2);
-                    Log.Out($"[EinmaligerSpawn] Server registriert Quest-Abschluss: POI '{poi.name}' (Status 2).");
-                    SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(this.poiId, 2));
+                    bool questAuthentifiziert = false;
+                    EntityPlayer requestingPlayer = null;
+
+                    // 1. Absender ermitteln (Multiplayer vs. lokaler Host)
+                    if (this.Sender != null)
+                    {
+                        GameManager.Instance.World.Players.dict.TryGetValue(this.Sender.entityId, out requestingPlayer);
+                    }
+                    else if (!GameManager.IsDedicatedServer)
+                    {
+                        requestingPlayer = GameManager.Instance.World.GetPrimaryPlayer();
+                    }
+
+                    // 2. Serverseitige Verifizierung des Quest-Tagebuchs
+                    if (requestingPlayer != null && requestingPlayer.QuestJournal != null && requestingPlayer.QuestJournal.quests != null)
+                    {
+                        foreach (Quest q in requestingPlayer.QuestJournal.quests)
+                        {
+                            if (q.CurrentState == Quest.QuestState.ReadyForTurnIn)
+                            {
+                                if (q.GetPositionData(out Vector3 qPos, Quest.PositionDataTypes.POIPosition))
+                                {
+                                    PrefabInstance qPoi = GameManager.Instance.GetDynamicPrefabDecorator()?.GetPrefabAtPosition(qPos);
+                                    if (qPoi != null && qPoi.id == this.poiId)
+                                    {
+                                        questAuthentifiziert = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Entscheidung fällen
+                    if (questAuthentifiziert)
+                    {
+                        PoiDatenbank.SetzeStatus(this.poiId, 2);
+                        Log.Out($"[EinmaligerSpawn] Server verifiziert Quest-Abschluss: POI '{poi.name}' (Status 2).");
+                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(this.poiId, 2));
+                    }
+                    else
+                    {
+                        string playerName = requestingPlayer != null ? requestingPlayer.EntityName : "Unbekannt";
+                        Log.Warning($"[EinmaligerSpawn] SECURITY-BLOCK: Client '{playerName}' hat versucht, POI '{poi.name}' als Quest abzuschließen, besitzt dort aber keine gültige Quest!");
+                    }
                 }
             }
             else if (this.requestedStatus == 3)

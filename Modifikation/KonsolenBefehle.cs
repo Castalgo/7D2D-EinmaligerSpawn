@@ -250,7 +250,7 @@ namespace EinmaligerSpawn.Commands
 
             if (useChunkCoords)
             {
-                var ergebnisChunk = KillCounter.BerechneLokalenFortschritt(targetChunkX, targetChunkZ, radiusMeter);
+                var ergebnisChunk = ChunkClearManager.BerechneLokalenFortschritt(targetChunkX, targetChunkZ, radiusMeter);
                 Log.Out($"=== Spawn-Radar ({radiusMeter}m) für Chunk [{targetChunkX}, {targetChunkZ}] ===\nStatus: {ergebnisChunk.gesperrt}/{ergebnisChunk.gesamt} ({ergebnisChunk.prozent}%)");
                 return;
             }
@@ -270,7 +270,7 @@ namespace EinmaligerSpawn.Commands
             if (targetPlayer == null) return;
 
             Vector3i pos = targetPlayer.GetBlockPosition();
-            var ergebnisSpieler = KillCounter.BerechneLokalenFortschritt(pos.x >> 4, pos.z >> 4, radiusMeter);
+            var ergebnisSpieler = ChunkClearManager.BerechneLokalenFortschritt(pos.x >> 4, pos.z >> 4, radiusMeter);
             Log.Out($"=== Spawn-Radar ({radiusMeter}m) für {targetPlayer.EntityName} ===\nStatus: {ergebnisSpieler.gesperrt}/{ergebnisSpieler.gesamt} ({ergebnisSpieler.prozent}%)");
         }
 
@@ -612,6 +612,8 @@ namespace EinmaligerSpawn.Commands
 
         /// Setzt Chunks im Umkreis auf gesäubert oder löscht den Status.
         /// Aufruf: esa cheat_clear [Spieler] [Radius] [clear/reset]
+        /// Setzt Chunks im Umkreis auf gesäubert oder löscht den Status.
+        /// Aufruf: esa cheat_clear [Spieler] [Radius] [clear/reset]
         private void CmdCheatClear(List<string> _params, CommandSenderInfo _senderInfo)
         {
             EntityPlayer targetPlayer = null;
@@ -697,18 +699,18 @@ namespace EinmaligerSpawn.Commands
 
                         if (isReset)
                         {
-                            if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
+                            if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
                             {
-                                KillCounter.ToteZombiesProChunk.Remove(chunkId);
+                                ChunkClearManager.ChunkClearLevel.Remove(chunkId);
                                 newlyModified++;
                             }
                         }
                         else
                         {
-                            if (!KillCounter.ToteZombiesProChunk.ContainsKey(chunkId))
-                                KillCounter.ToteZombiesProChunk[chunkId] = 0;
+                            if (!ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
+                                ChunkClearManager.ChunkClearLevel[chunkId] = 0;
 
-                            KillCounter.ToteZombiesProChunk[chunkId]++;
+                            ChunkClearManager.ChunkClearLevel[chunkId]++;
                             newlyModified++;
 
                             SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
@@ -721,6 +723,20 @@ namespace EinmaligerSpawn.Commands
             SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa range] Ich habe {totalChecked} Chunks im Umkreis von {targetPlayer.EntityName} geprüft und {newlyModified} {actionText}.");
 
             SimpleMinimap_Patch.ErzwingeRedraw = true;
+
+            // WARNSYSTEM BEIM RESET
+            if (isReset && newlyModified > 0)
+            {
+                int spielerAnzahl = GameManager.Instance.World.Players.list.Count;
+                bool hatExterneClients = GameManager.IsDedicatedServer ? spielerAnzahl > 0 : spielerAnzahl > 1;
+
+                if (hatExterneClients)
+                {
+                    string warnMsg = "[FFFF00]Warnung: Ein Chunk-Reset wurde durchgeführt! Eure lokalen Karten-Daten sind nun asynchron. Bitte verbindet euch einmal neu, um das Problem zu beheben.[-]";
+
+                    GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, warnMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                }
+            }
         }
 
         /// Legt das globale Autospawn-Limit für Zombies auf dem Server fest.
@@ -879,7 +895,7 @@ namespace EinmaligerSpawn.Commands
             }
 
             Vector3i pos = targetPlayer.GetBlockPosition();
-            var ergebnis = KillCounter.BerechneLokalenFortschritt(pos.x >> 4, pos.z >> 4, radiusMeter);
+            var ergebnis = ChunkClearManager.BerechneLokalenFortschritt(pos.x >> 4, pos.z >> 4, radiusMeter);
 
             string msg1 = $"Spieler {targetPlayer.EntityName} hat um sich herum ({radiusMeter}m)";
             string msg2 = $"{ergebnis.gesperrt} von {ergebnis.gesamt} ({ergebnis.prozent}%) gecleart.";
@@ -929,16 +945,16 @@ namespace EinmaligerSpawn.Commands
 
             string extraMsg = "";
 
-            // 3. HARD-Modus: Alle 0-Einträge aus dem KillCounter löschen
+            // 3. HARD-Modus: Alle 0-Einträge aus dem ChunkClearManager löschen
             if (isHard)
             {
-                int geloeschteChunks = KillCounter.Debug_EntferneNullEintraege();
+                int geloeschteChunks = ChunkClearManager.Debug_EntferneNullEintraege();
 
                 // Sofortiges Speichern der bereinigten Datenbank
                 string saveDir = GameIO.GetSaveGameDir();
                 if (!string.IsNullOrEmpty(saveDir))
                 {
-                    KillCounter.Save(saveDir);
+                    ChunkClearManager.Save(saveDir);
                 }
 
                 extraMsg = $" (Hard-Mode: {geloeschteChunks} Chunks mit 0 Kills gelöscht)";
@@ -960,9 +976,9 @@ namespace EinmaligerSpawn.Commands
                         string chunkId = $"{chunk.X}_{chunk.Z}";
 
                         // Nur löschen, wenn er existiert und auf 0 steht
-                        if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills) && kills == 0)
+                        if (ChunkClearManager.ChunkClearLevel.TryGetValue(chunkId, out int kills) && kills == 0)
                         {
-                            KillCounter.ToteZombiesProChunk.Remove(chunkId);
+                            ChunkClearManager.ChunkClearLevel.Remove(chunkId);
                             localDeleted++;
                         }
                     }

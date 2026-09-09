@@ -6,14 +6,13 @@ using EinmaligerSpawn.Config;
 using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.Network;
 using Newtonsoft.Json;
-using UnityEngine;
 
 namespace EinmaligerSpawn.ChunkDatenbank
 {
-    public static class KillCounter
+    public static class ChunkClearManager
     {
         // Speichert die Anzahl der GETÖTETEN Zombies pro Chunk
-        public static Dictionary<string, int> ToteZombiesProChunk = new Dictionary<string, int>();
+        public static Dictionary<string, int> ChunkClearLevel = new Dictionary<string, int>();
 
         // Das temporäre Gedächtnis (Entity-ID -> Ursprungs-Chunk-ID)
         public static Dictionary<int, string> ZombieUrsprung = new Dictionary<int, string>();
@@ -26,17 +25,17 @@ namespace EinmaligerSpawn.ChunkDatenbank
         // Nur Server: Zählt einen Kill direkt über die Chunk-ID hoch
         public static void AddToterZombieNachID(string chunkId, int maxZombies)
         {
-            if (!ToteZombiesProChunk.ContainsKey(chunkId))
+            if (!ChunkClearLevel.ContainsKey(chunkId))
             {
-                ToteZombiesProChunk[chunkId] = 0;
+                ChunkClearLevel[chunkId] = 0;
             }
 
-            ToteZombiesProChunk[chunkId]++;
+            ChunkClearLevel[chunkId]++;
 
             // Kompromisslose Rückeroberung: Wildnis-Chunks verriegeln nach exakt 1 Kill.
             int abriegelungsLimit = 1;
 
-            if (ToteZombiesProChunk[chunkId] == abriegelungsLimit)
+            if (ChunkClearLevel[chunkId] == abriegelungsLimit)
             {
                 Log.Warning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
 
@@ -66,14 +65,14 @@ namespace EinmaligerSpawn.ChunkDatenbank
         public static void VerbucheTaktischenKill(string chunkId, bool istNachbar)
         {
             // Sicherheitsprüfung: Falls der Chunk ohnehin schon leer ist, nur hochzählen
-            if (ToteZombiesProChunk.ContainsKey(chunkId) && ToteZombiesProChunk[chunkId] >= 1)
+            if (ChunkClearLevel.ContainsKey(chunkId) && ChunkClearLevel[chunkId] >= 1)
             {
-                ToteZombiesProChunk[chunkId]++;
+                ChunkClearLevel[chunkId]++;
                 return;
             }
 
             // Chunk auf gesäubert setzen
-            ToteZombiesProChunk[chunkId] = 1;
+            ChunkClearLevel[chunkId] = 1;
 
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
@@ -122,10 +121,10 @@ namespace EinmaligerSpawn.ChunkDatenbank
         public static bool IstChunkAusgerottet(Vector3i pos, int maxZombies)
         {
             string id = GetChunkId(pos);
-            if (ToteZombiesProChunk.ContainsKey(id))
+            if (ChunkClearLevel.ContainsKey(id))
             {
                 // Sobald auch nur 1 Kill registriert wurde, blockiert der Chunk neue Biom-Spawns
-                return ToteZombiesProChunk[id] >= 1;
+                return ChunkClearLevel[id] >= 1;
             }
             return false;
         }
@@ -139,8 +138,8 @@ namespace EinmaligerSpawn.ChunkDatenbank
                 try
                 {
                     string json = File.ReadAllText(path);
-                    ToteZombiesProChunk = JsonConvert.DeserializeObject<Dictionary<string, int>>(json) ?? new Dictionary<string, int>();
-                    Log.Out($"[EinmaligerSpawn] {ToteZombiesProChunk.Count} Chunk-Daten erfolgreich geladen.");
+                    ChunkClearLevel = JsonConvert.DeserializeObject<Dictionary<string, int>>(json) ?? new Dictionary<string, int>();
+                    Log.Out($"[EinmaligerSpawn] {ChunkClearLevel.Count} Chunk-Daten erfolgreich geladen.");
                 }
                 catch (Exception e)
                 {
@@ -149,7 +148,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
             }
             else
             {
-                ToteZombiesProChunk.Clear();
+                ChunkClearLevel.Clear();
             }
         }
 
@@ -161,7 +160,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
                 string path = Path.Combine(saveDir, "ausgerotteteChunks.json");
 
                 // Hochperformante Sortierung (IntroSort) speziell für riesige Listen beim Speichern
-                var sortedChunks = ToteZombiesProChunk
+                var sortedChunks = ChunkClearLevel
                     .OrderBy(kvp => kvp.Key)
                     .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
@@ -189,7 +188,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
                     gesamtChunks++;
                     string chunkId = $"{cx}_{cz}";
 
-                    if (ToteZombiesProChunk.TryGetValue(chunkId, out int kills) && kills > 0)
+                    if (ChunkClearLevel.TryGetValue(chunkId, out int kills) && kills > 0)
                     {
                         gesperrteChunks++;
                     }
@@ -204,14 +203,14 @@ namespace EinmaligerSpawn.ChunkDatenbank
         public static int Debug_EntferneNullEintraege()
         {
             // Sammelt alle Chunk-IDs, deren Kill-Zahl 0 ist
-            var zuLoeschendeKeys = ToteZombiesProChunk
+            var zuLoeschendeKeys = ChunkClearLevel
                 .Where(kvp => kvp.Value == 0)
                 .Select(kvp => kvp.Key)
                 .ToList();
 
             foreach (var key in zuLoeschendeKeys)
             {
-                ToteZombiesProChunk.Remove(key);
+                ChunkClearLevel.Remove(key);
             }
 
             return zuLoeschendeKeys.Count;

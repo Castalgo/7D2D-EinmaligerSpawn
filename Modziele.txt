@@ -32,3 +32,5 @@ Idee für zukünftige Erweiterung
 - Spiel beitreten: Freeze-Grund bestimmen und fixen
 
 - Spawndistanz im MP
+
+- POI Name auf ANzeigename ändern, sofern vorhanden (aber nur in den notifications)

@@ -120,10 +120,10 @@ namespace EinmaligerSpawn.LocalClear
         // Server only: Prüft, ob der Chunk gesäubert werden kann, und markiert ihn als gesäubert
         private static bool PruefeUndSaeubere(string chunkId, EntityPlayer player)
         {
-            if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
+            if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId) && ChunkClearManager.ChunkClearLevel[chunkId] >= 1)
                 return false;
 
-            if (KillCounter.ZombieUrsprung.ContainsValue(chunkId))
+            if (ChunkClearManager.ZombieUrsprung.ContainsValue(chunkId))
                 return false;
 
             foreach (Entity ent in GameManager.Instance.World.Entities.list)
@@ -148,7 +148,7 @@ namespace EinmaligerSpawn.LocalClear
                 }
             }
 
-            KillCounter.ToteZombiesProChunk[chunkId] = 1;
+            ChunkClearManager.ChunkClearLevel[chunkId] = 1;
 
             Log.Warning($"[EinmaligerSpawn] Walkthrough-Clear: Chunk {chunkId} wurde durch friedliche Präsenz von '{player.EntityName}' gesäubert.");
 
@@ -210,9 +210,9 @@ namespace EinmaligerSpawn.LocalClear
             int cz = pos.z >> 4;
             string chunkId = $"{cx}_{cz}";
 
-            if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
+            if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId) && ChunkClearManager.ChunkClearLevel[chunkId] >= 1)
             {
-                int kills = KillCounter.ToteZombiesProChunk[chunkId];
+                int kills = ChunkClearManager.ChunkClearLevel[chunkId];
                 OutputMsg($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Dieser Chunk ({chunkId}) ist bereits als gesäubert markiert! Registrierte Kills hier: {kills}");
                 return;
             }
@@ -229,7 +229,7 @@ namespace EinmaligerSpawn.LocalClear
                     bool istBlockierer = false;
                     EntityAlive enemyAlive = ent as EntityAlive;
 
-                    if (KillCounter.ZombieUrsprung.TryGetValue(ent.entityId, out string uChunk) && uChunk == chunkId)
+                    if (ChunkClearManager.ZombieUrsprung.TryGetValue(ent.entityId, out string uChunk) && uChunk == chunkId)
                     {
                         ursprungGefunden = true;
                         istBlockierer = true;

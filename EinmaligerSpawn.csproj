@@ -89,7 +89,7 @@
     <Compile Include="Modifikation\Network.cs" />
     <Compile Include="Modifikation\POI_Tracker.cs" />
     <Compile Include="Modifikation\SpawnBlocker.cs" />
-    <Compile Include="Modifikation\KillCounter.cs" />
+    <Compile Include="Modifikation\ChunkClearManager.cs" />
     <Compile Include="Modifikation\KartenOverlay.cs" />
     <Compile Include="Modifikation\LokalenChunkSaeubern.cs" />
     <Compile Include="Modifikation\ModEinstellungen.cs" />

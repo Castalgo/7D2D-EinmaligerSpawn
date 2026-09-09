@@ -26,10 +26,10 @@ namespace EinmaligerSpawn.SpawnBlocker
 
             // FEIND-FILTER: Wir ermitteln die Chunk-ID der Biom-Area.
             Vector3i chunkPos = _spawnData.chunk.GetWorldPos();
-            string chunkId = KillCounter.GetChunkId(chunkPos);
+            string chunkId = ChunkClearManager.GetChunkId(chunkPos);
 
             // Ist dieser Chunk bereits in der Datenbank und als ausgerottet markiert?
-            if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
+            if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId) && ChunkClearManager.ChunkClearLevel[chunkId] >= 1)
             {
                 // VETO! Der Chunk ist ausgerottet. Die gesamte Spawn-Methode für Biom-Zombies wird hier abgebrochen.
                 return false;
@@ -57,9 +57,9 @@ namespace EinmaligerSpawn.SpawnBlocker
             if (__result)
             {
                 Vector3i spawnPos = new Vector3i(_position);
-                string chunkId = KillCounter.GetChunkId(spawnPos);
+                string chunkId = ChunkClearManager.GetChunkId(spawnPos);
 
-                if (KillCounter.ToteZombiesProChunk.ContainsKey(chunkId) && KillCounter.ToteZombiesProChunk[chunkId] >= 1)
+                if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId) && ChunkClearManager.ChunkClearLevel[chunkId] >= 1)
                 {
                     // VETO! Wir sabotieren die Koordinaten-Suche der Event-Horde
                     __result = false;
@@ -84,12 +84,12 @@ namespace EinmaligerSpawn.SpawnBlocker
             if (_entity != null && (_entity is EntityEnemy || _entity is EntityZombie))
             {
                 // Nur eintragen, wenn der AutoSpawner die ID nicht schon reserviert hat
-                if (!KillCounter.ZombieUrsprung.ContainsKey(_entity.entityId))
+                if (!ChunkClearManager.ZombieUrsprung.ContainsKey(_entity.entityId))
                 {
                     Vector3i physischePosition = _entity.GetBlockPosition();
-                    string exakterChunkID = KillCounter.GetChunkId(physischePosition);
+                    string exakterChunkID = ChunkClearManager.GetChunkId(physischePosition);
 
-                    KillCounter.ZombieUrsprung[_entity.entityId] = exakterChunkID;
+                    ChunkClearManager.ZombieUrsprung[_entity.entityId] = exakterChunkID;
                 }
             }
         }
@@ -103,11 +103,11 @@ namespace EinmaligerSpawn.SpawnBlocker
         // Wird vom AutoSpawner in regelmäßigen Abständen aufgerufen
         public static void BereinigeGeisterZombies()
         {
-            if (KillCounter.ZombieUrsprung.Count == 0) return;
+            if (ChunkClearManager.ZombieUrsprung.Count == 0) return;
 
             List<int> geisterIds = new List<int>();
 
-            foreach (int zombieId in KillCounter.ZombieUrsprung.Keys)
+            foreach (int zombieId in ChunkClearManager.ZombieUrsprung.Keys)
             {
                 // Prüft, ob die Entity-ID in der Welt noch existiert
                 if (!GameManager.Instance.World.Entities.dict.ContainsKey(zombieId))
@@ -120,7 +120,7 @@ namespace EinmaligerSpawn.SpawnBlocker
             {
                 foreach (int id in geisterIds)
                 {
-                    KillCounter.ZombieUrsprung.Remove(id);
+                    ChunkClearManager.ZombieUrsprung.Remove(id);
                 }
             }
         }

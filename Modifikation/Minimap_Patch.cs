@@ -94,7 +94,7 @@ namespace EinmaligerSpawn.Minimap_Patch
                     string chunkId = $"{worldChunkX}_{worldChunkZ}";
 
                     // Prüfen, ob unser Chunk als "gecleart" gilt
-                    if (KillCounter.ToteZombiesProChunk.TryGetValue(chunkId, out int kills) && kills >= 1)
+                    if (ChunkClearManager.ChunkClearLevel.TryGetValue(chunkId, out int kills) && kills >= 1)
                     {
                         // NEU: Ist dieser Chunk frisch gecleart (und soll gelb/orange leuchten)?
                         bool isNeuGecleart = KartenOverlay.NeuGeclearteChunks.ContainsKey(chunkId);
