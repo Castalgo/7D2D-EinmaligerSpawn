@@ -8,7 +8,7 @@ namespace EinmaligerSpawn.Config
     public static class ModEinstellungen
     {
         public static float BuffUpdateIntervall = 2f;
-        public static bool ChatNachrichtenAktiv = true;
+        public static int ChatNachrichtenModus = 3; // 0=Off, 1=POIs, 2=Chunks, 3=All
         public static int GlobalesZombieLimit = 18;
         public static bool GlobalScanAbgeschlossen = false;
         public static bool KartenOverlayAktiv = true;
@@ -42,7 +42,7 @@ namespace EinmaligerSpawn.Config
                         TaktischerKillAktiv = config.TaktischerKillAktiv;
 
                         // Optische Features & UI werden bei reinen Servern immer zwangsweise deaktiviert
-                        ChatNachrichtenAktiv = isDedicated ? false : config.ChatNachrichtenAktiv;
+                        ChatNachrichtenModus = isDedicated ? 0 : config.ChatNachrichtenModus;
                         KartenOverlayAktiv = isDedicated ? false : config.KartenOverlayAktiv;
                         ZeigeLokalenFortschritt = isDedicated ? false : config.ZeigeLokalenFortschritt;
                     }
@@ -64,7 +64,7 @@ namespace EinmaligerSpawn.Config
                 TaktischerKillAktiv = true;
 
                 // Per Default deaktiviert, wenn es ein reiner Server ist
-                ChatNachrichtenAktiv = !isDedicated;
+                ChatNachrichtenModus = isDedicated ? 0 : 3;
                 KartenOverlayAktiv = !isDedicated;
                 ZeigeLokalenFortschritt = !isDedicated;
             }
@@ -97,7 +97,7 @@ namespace EinmaligerSpawn.Config
                 {
                     // alphabetische Reihenfolge der Eigenschaften
                     BuffUpdateIntervall = BuffUpdateIntervall,
-                    ChatNachrichtenAktiv = ChatNachrichtenAktiv,
+                    ChatNachrichtenModus = ChatNachrichtenModus,
                     GlobalesZombieLimit = GlobalesZombieLimit,
                     GlobalScanAbgeschlossen = GlobalScanAbgeschlossen,
                     KartenOverlayAktiv = KartenOverlayAktiv,
@@ -120,7 +120,7 @@ namespace EinmaligerSpawn.Config
         private class ConfigDaten
         {
             public float BuffUpdateIntervall { get; set; } = 2f;
-            public bool ChatNachrichtenAktiv { get; set; } = true;
+            public int ChatNachrichtenModus { get; set; } = 3;
             public int GlobalesZombieLimit { get; set; } = 18;
             public bool GlobalScanAbgeschlossen { get; set; } = false;
             public bool KartenOverlayAktiv { get; set; } = true;

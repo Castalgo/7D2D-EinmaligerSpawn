@@ -15,6 +15,8 @@ Die Mod registriert, wenn du einen Chunk oder ein POI von Zombies gesäubert has
 
 **Wichtig für Multiplayer:** Diese Mod kommuniziert über eigene Netzwerkpakete und muss daher **sowohl auf dem Server als auch bei allen Clients** installiert sein. Die Mod unterstützt kein EAC, d. h. der Server muss EAC abgeschaltet haben.
 
+**Empfehlung / Kompatibilität:** Diese Mod funktioniert hervorragend mit der [Advanced Minimap mod](https://www.nexusmods.com/7daystodie/mods/11073) zusammen. Wir empfehlen ausdrücklich, diese zusätzlich zu installieren, damit das dynamische POI-Radar und das Karten-Overlay der gesäuberten Gebiete in Echtzeit direkt auf deiner Minimap angezeigt werden!
+
 ## Das Grafische Ingame-Menü (Neu)
 Fast alle Funktionen der Mod lassen sich nun bequem über ein eigenes UI-Menü steuern.
 *   **Zugriff:** Öffne die Ingame-Karte und klicke oben auf den Button "Show ES Menu".
@@ -38,8 +40,8 @@ Das Vanilla-Spawnsystem agiert oft zu langsam. Unser AutoSpawner sorgt dafür, d
 
 ## Wichtige Hinweise zum Gameplay
 *   **Heat-Spawns:** Heat-Spawns (wie z. B. Screamer) müssen zwingend deaktiviert sein, weil sie die Spawnlogik der Mod umgehen.
-*   **Blutmond:** Ein Blutmond ergibt spieltechnisch keinen Sinn und sollte deaktiviert sein.
-*   **Buff für neue Spieler:** Die Mod berücksichtigt deinen Level- und Spielzeit-Fortschritt und verschont dich anfangs (Anfängerschutz).
+*   **Blutmond:** Ein Blutmond ergibt spieltechnisch keinen Sinn, weil geblockte Biom-Spawns auch Blutmondzombies am spawnen hindert.
+*   **Buff für neue Spieler:** Die Mod berücksichtigt deinen Level- und Spielzeit-Fortschritt und verschont dich anfangs (Anfängerschutz), aber setzt den Lokaler Chunk Clear-Zeitbedarf ebenfalls hoch.
 
 ## Sandbox-Einstellungen (`Sandboxeinstellungen.txt`)
 Für die Weltgenerierung und die korrekte Funktion der Mod müssen die Sandbox-Einstellungen zwingend vom User korrekt gesetzt werden.

@@ -106,23 +106,19 @@ namespace EinmaligerSpawn.PoiTracker
         }
     }
 
-    // Berechnet lokal auf dem Client, ob der Spieler sich in einem ungesäuberten POI befindet, 
-    // und platziert dynamisch die entsprechenden XML-Map-Marker.
+    // Berechnet lokal auf dem Client (oder fragt den Server), ob der Spieler sich in einem 
+    // ungesäuberten POI befindet, und platziert dynamisch die entsprechenden XML-Map-Marker.
     public class PoiRadarManager : MonoBehaviour
     {
         private float updateTimer = 0f;
         private const float UpdateIntervall = 2f;
 
-        // Speicher für die Marker-Objekte
         private Dictionary<int, NavObject> aktiveMarker = new Dictionary<int, NavObject>();
 
-        // CLIENT-Gedächtnis: Hier landen die Koordinaten aus dem NetPackage
+        // CLIENT-Gedächtnis: Hier landen die Koordinaten und Typen aus dem NetPackage
         public static Dictionary<int, Vector3> ClientZiele = new Dictionary<int, Vector3>();
+        public static Dictionary<int, string> ClientMarkerKlassen = new Dictionary<int, string>();
 
-        // SERVER-Gedächtnis: Verhindert, dass wir denselben Raum jede Sekunde neu funken
-        private static Dictionary<int, Vector3> ServerLetzteZiele = new Dictionary<int, Vector3>();
-
-        // POIs ohne SleeperVolumes sind uninteressant. Wir prüfen das einmalig pro POI und merken uns das Ergebnis.
         private static Dictionary<string, bool> lokalerSleeperCache = new Dictionary<string, bool>();
 
         void Update()
@@ -135,7 +131,6 @@ namespace EinmaligerSpawn.PoiTracker
             }
         }
 
-        // Prüft, ob die lokale XML-Datei des Clients überhaupt SleeperVolumes enthält. 
         private bool HatLokaleSleeper(string prefabName)
         {
             if (lokalerSleeperCache.TryGetValue(prefabName, out bool hatSleeper)) return hatSleeper;
@@ -193,51 +188,6 @@ namespace EinmaligerSpawn.PoiTracker
                     if (!player.ChunkObserver.mapDatabase.Contains(chunkKey)) continue;
                 }
 
-                // =========================================================
-                // 3. VOLUMEN-ANALYSE
-                // =========================================================
-                int totalValid = 0;
-                int clearedValid = 0;
-                bool hasUnclearedBossRoom = false;
-                SleeperVolume nextTarget = null;
-
-                if (poi.sleeperVolumes != null)
-                {
-                    foreach (SleeperVolume vol in poi.sleeperVolumes)
-                    {
-                        if (vol.IsTrigger || vol.isQuestExclude) continue;
-
-                        totalValid++;
-                        if (vol.wasCleared)
-                        {
-                            clearedValid++;
-                        }
-                        else
-                        {
-                            if (vol.isPriority) hasUnclearedBossRoom = true;
-                            if (nextTarget == null) nextTarget = vol;
-                        }
-                    }
-                }
-
-                // =========================================================
-                // 4. LOKALE ANALYSE & PRÜF-ANFRAGE AN SERVER
-                // =========================================================
-                if (totalValid > 0 && clearedValid >= totalValid)
-                {
-                    if (PoiDatenbank.LeseStatus(poi.id) != 1)
-                    {
-                        // Der Client bittet den Server höflich um Verifizierung (Status 1 anfordern)
-                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendToServer(
-                            NetPackageManager.GetPackage<NetPackageRequestPoiCheck>().Setup(poi.id, 1)
-                        );
-                    }
-                    continue; // Marker für dieses Gebäude ausblenden
-                }
-
-                // =========================================================
-                // 5. MARKER ZEICHNEN (Autonom auf dem Client)
-                // =========================================================
                 aktuellePoiIds.Add(poi.id);
 
                 Vector3 centerPoiPos = new Vector3(
@@ -253,33 +203,93 @@ namespace EinmaligerSpawn.PoiTracker
                 string benoetigteKlasse = "es_poi_global";
                 Vector3 markerPos = centerPoiPos;
 
-                if (isInside && nextTarget != null)
+                if (isInside)
                 {
-                    // Client nutzt seine eigene Berechnung, kein Netzwerk-Warten nötig!
-                    markerPos = nextTarget.Center;
-                    benoetigteKlasse = "es_poi_map_only";
-
-                    if (poi.prefab != null && poi.prefab.DifficultyTier > 0)
+                    if (isServer)
                     {
-                        byte poiStatus = PoiDatenbank.LeseStatus(poi.id);
-                        if (poiStatus == 2)
-                        {
-                            benoetigteKlasse = "es_poi_local";
-                        }
-                        else
-                        {
-                            int remaining = totalValid - clearedValid;
-                            int threshold = (totalValid < 5) ? 1 : (totalValid < 10) ? 2 : (totalValid < 20) ? 3 : 4;
+                        // HOST-LOGIK: Host liest Sleeper-Volumen direkt fehlerfrei aus dem RAM aus
+                        int totalValid = 0;
+                        int clearedValid = 0;
+                        bool hasUnclearedBossRoom = false;
+                        SleeperVolume nextTarget = null;
 
-                            if (!hasUnclearedBossRoom && remaining <= threshold)
+                        if (poi.sleeperVolumes != null)
+                        {
+                            foreach (SleeperVolume vol in poi.sleeperVolumes)
                             {
-                                benoetigteKlasse = "es_poi_local";
+                                if (vol.IsTrigger || vol.isQuestExclude) continue;
+
+                                totalValid++;
+                                if (vol.wasCleared) clearedValid++;
+                                else
+                                {
+                                    if (vol.isPriority) hasUnclearedBossRoom = true;
+                                    if (nextTarget == null) nextTarget = vol;
+                                }
                             }
+                        }
+
+                        if (totalValid > 0 && clearedValid >= totalValid)
+                        {
+                            if (PoiDatenbank.LeseStatus(poi.id) != 1)
+                            {
+                                PoiDatenbank.SetzeStatus(poi.id, 1);
+                                
+                                // LOKALE NACHRICHT FÜR DEN EINZELSPIELER
+                                if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 1 || ModEinstellungen.ChatNachrichtenModus == 3))
+                                {
+                                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+                                    string feedbackMsg = $"[00FF00][Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}] POI {poi.name} wurde restlos gesäubert![-]";
+                                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                                }
+
+                                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id, 1));
+                                SimpleMinimap_Patch.ErzwingeRedraw = true;
+                            }
+                            continue; // Marker löschen
+                        }
+                        else if (nextTarget != null)
+                        {
+                            markerPos = nextTarget.Center;
+                            benoetigteKlasse = "es_poi_map_only";
+
+                            if (poi.prefab != null && poi.prefab.DifficultyTier > 0)
+                            {
+                                byte poiStatus = PoiDatenbank.LeseStatus(poi.id);
+                                if (poiStatus == 2)
+                                {
+                                    benoetigteKlasse = "es_poi_local";
+                                }
+                                else
+                                {
+                                    int remaining = totalValid - clearedValid;
+                                    int threshold = (totalValid < 5) ? 1 : (totalValid < 10) ? 2 : (totalValid < 20) ? 3 : 4;
+
+                                    if (!hasUnclearedBossRoom && remaining <= threshold)
+                                    {
+                                        benoetigteKlasse = "es_poi_local";
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // CLIENT-LOGIK: Fragt Server nach Radar-Updates (Status 3)
+                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendToServer(
+                            NetPackageManager.GetPackage<NetPackageRequestPoiCheck>().Setup(poi.id, 3)
+                        );
+
+                        // Nutzt die letzte erhaltene Antwort des Servers aus dem Gedächtnis
+                        if (ClientZiele.TryGetValue(poi.id, out Vector3 empfangenesZiel) && ClientMarkerKlassen.TryGetValue(poi.id, out string empfangeneKlasse))
+                        {
+                            markerPos = empfangenesZiel;
+                            benoetigteKlasse = empfangeneKlasse;
                         }
                     }
                 }
 
-                // 6. FLACKER-SCHUTZ & LÖSCH-LOGIK
+                // FLACKER-SCHUTZ & ZEICHNEN
                 if (aktiveMarker.TryGetValue(poi.id, out NavObject vorhandenerMarker))
                 {
                     if (vorhandenerMarker == null || vorhandenerMarker.NavObjectClass == null || vorhandenerMarker.NavObjectClass.NavObjectClassName != benoetigteKlasse)
@@ -302,7 +312,7 @@ namespace EinmaligerSpawn.PoiTracker
                 }
             }
 
-            // 7. AUFRÄUMEN
+            // AUFRÄUMEN
             List<int> zuLoeschen = new List<int>();
             foreach (var kvp in aktiveMarker)
             {
@@ -317,6 +327,7 @@ namespace EinmaligerSpawn.PoiTracker
             {
                 aktiveMarker.Remove(id);
                 ClientZiele.Remove(id);
+                ClientMarkerKlassen.Remove(id);
             }
         }
 
@@ -328,7 +339,7 @@ namespace EinmaligerSpawn.PoiTracker
             }
             aktiveMarker.Clear();
             ClientZiele.Clear();
-            ServerLetzteZiele.Clear();
+            ClientMarkerKlassen.Clear();
         }
     }
 }

@@ -143,7 +143,7 @@ public class XUiC_GrafischeModEinstellungen : XUiController
         if (btnToggleMsg != null)
         {
             btnToggleMsg.Enabled = true;
-            btnToggleMsg.Text = ModEinstellungen.ChatNachrichtenAktiv ? "ACTIVE" : "DISABLED";
+            btnToggleMsg.Text = GetMsgButtonText(ModEinstellungen.ChatNachrichtenModus);
         }
 
         if (btnToggleClearing != null)
@@ -241,14 +241,34 @@ public class XUiC_GrafischeModEinstellungen : XUiController
     // Klick (Client): Schaltet die Benachrichtigungen im Chat um (ON/OFF).
     private void BtnToggleMsg_OnPressed(XUiController _sender, int _mouseButton)
     {
-        ModEinstellungen.ChatNachrichtenAktiv = !ModEinstellungen.ChatNachrichtenAktiv;
-        ModEinstellungen.Speichern();
+        // Rotiert: 3 (All) -> 1 (POIs) -> 2 (Chunks) -> 0 (Off) -> 3 (All)
+        int mode = ModEinstellungen.ChatNachrichtenModus;
+        if (mode == 3) mode = 1;
+        else if (mode == 1) mode = 2;
+        else if (mode == 2) mode = 0;
+        else mode = 3;
+
+        string cmd = "es msg off";
+        if (mode == 3) cmd = "es msg on";
+        else if (mode == 1) cmd = "es msg pois";
+        else if (mode == 2) cmd = "es msg chunks";
+
+        SingletonMonoBehaviour<SdtdConsole>.Instance.ExecuteSync(cmd, null);
 
         if (btnToggleMsg != null)
         {
-            btnToggleMsg.Text = ModEinstellungen.ChatNachrichtenAktiv ? "ACTIVE" : "DISABLED";
+            btnToggleMsg.Text = GetMsgButtonText(mode);
         }
         Manager.PlayInsidePlayerHead("craft_complete_item", -1, 0f, false, false);
+    }
+
+    // Hilfsmethode für den Button-Text
+    private string GetMsgButtonText(int modus)
+    {
+        if (modus == 3) return "ACTIVE";
+        if (modus == 1) return "POIS ONLY";
+        if (modus == 2) return "CHUNKS ONLY";
+        return "DISABLED";
     }
 
     // Klick (Client): Schaltet den HUD Fortschritts-Buff um (ON/OFF).

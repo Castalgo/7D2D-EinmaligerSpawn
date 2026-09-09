@@ -132,24 +132,33 @@ namespace EinmaligerSpawn.Commands
 
             if (_params.Count < 2)
             {
-                Log.Out($"Aktueller Status: {(ModEinstellungen.ChatNachrichtenAktiv ? "ON" : "OFF")}. Bitte nutze 'es msg on/off'.");
+                Log.Out($"Aktueller Modus: {ModEinstellungen.ChatNachrichtenModus}. Bitte nutze 'es msg <on/off/pois/chunks>'.");
                 return;
             }
 
             string state = _params[1].ToLower();
 
-            if (state == "on" || state == "true")
+            if (state == "on" || state == "all" || state == "true")
             {
-                ModEinstellungen.ChatNachrichtenAktiv = true;
-                ModEinstellungen.Speichern();
-                Log.Out("[ES Msg] Lokale Chat-Nachrichten sind nun AKTIVIERT.");
+                ModEinstellungen.ChatNachrichtenModus = 3;
+                Log.Out("[ES Msg] Lokale Chat-Nachrichten: ALLE aktiviert.");
             }
-            else if (state == "off" || state == "false")
+            else if (state == "pois" || state == "poi")
             {
-                ModEinstellungen.ChatNachrichtenAktiv = false;
-                ModEinstellungen.Speichern();
-                Log.Out("[ES Msg] Lokale Chat-Nachrichten sind nun DEAKTIVIERT.");
+                ModEinstellungen.ChatNachrichtenModus = 1;
+                Log.Out("[ES Msg] Lokale Chat-Nachrichten: NUR POIs aktiviert.");
             }
+            else if (state == "chunks" || state == "chunk")
+            {
+                ModEinstellungen.ChatNachrichtenModus = 2;
+                Log.Out("[ES Msg] Lokale Chat-Nachrichten: NUR CHUNKS aktiviert.");
+            }
+            else if (state == "off" || state == "false" || state == "none")
+            {
+                ModEinstellungen.ChatNachrichtenModus = 0;
+                Log.Out("[ES Msg] Lokale Chat-Nachrichten: DEAKTIVIERT.");
+            }
+            ModEinstellungen.Speichern();
         }
 
         /// Steuert den HUD-Fortschritts-Buff, dessen Intervall oder dessen Suchradius.

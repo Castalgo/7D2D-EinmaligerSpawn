@@ -41,7 +41,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
                 Log.Warning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
 
                 // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3)
                 {
                     ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
                     string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
@@ -85,7 +85,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
                 Log.Warning($"[EinmaligerSpawn] Taktischer Bonus: Nachbar {chunkId} zusätzlich gesichert!");
 
                 // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3))
                 {
                     ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
                     string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
@@ -101,7 +101,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
                 Log.Warning($"[EinmaligerSpawn] Taktischer Clear! Todes-Chunk {chunkId} wurde gesichert.");
 
                 // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3))
                 {
                     ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
                     string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";

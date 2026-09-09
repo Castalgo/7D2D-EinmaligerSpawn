@@ -115,7 +115,7 @@ namespace EinmaligerSpawn.Network
                     datenGeaendert = true;
 
                     // LOKALE CHAT-NACHRICHT FÜR DEN SPIELER
-                    if (!this.isLoginSync && ModEinstellungen.ChatNachrichtenAktiv)
+                    if (!this.isLoginSync && (ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3))
                     {
                         ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
                         string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
@@ -177,7 +177,6 @@ namespace EinmaligerSpawn.Network
             return this;
         }
 
-        // NIMMT JETZT 2 ARGUMENTE AN (Abwärtskompatibel durch '= 1')
         public NetPackagePoiSync SetupForLive(int einzelnerPoi, byte neuerStatus = 1)
         {
             this.syncPois.Clear();
@@ -219,11 +218,14 @@ namespace EinmaligerSpawn.Network
         {
             if (_world == null) return;
 
+            // WICHTIG: Nur Clients werten dieses Paket aus. 
+            // Der Server hat seine eigene Datenbank bereits VOR dem Senden lokal aktualisiert.
+            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
+
             foreach (var kvp in syncPois)
             {
                 int poiId = kvp.Key;
                 byte empfangenerStatus = kvp.Value;
-
                 byte lokalerStatus = PoiDatenbank.LeseStatus(poiId);
 
                 // Nur verarbeiten, wenn sich der Status wirklich geändert hat
@@ -232,35 +234,20 @@ namespace EinmaligerSpawn.Network
                     PoiDatenbank.SetzeStatus(poiId, empfangenerStatus);
 
                     // CHAT-NACHRICHT NUR BEI STATUS 1 (Komplett gesäubert)
-                    if (empfangenerStatus == 1 && !this.isLoginSync && !GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                    if (empfangenerStatus == 1 && !this.isLoginSync && (ModEinstellungen.ChatNachrichtenModus == 1 || ModEinstellungen.ChatNachrichtenModus == 3))
                     {
                         string poiName = "Unbekannt";
                         PrefabInstance poi = GameManager.Instance.GetDynamicPrefabDecorator()?.GetPrefab(poiId);
-                        if (poi != null)
-                        {
-                            poiName = poi.name;
-                        }
+                        if (poi != null) poiName = poi.name;
 
                         ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                        string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
-                        string feedbackMsg = $"[00FF00][{timeString}] POI '{poiName}' wurde restlos gesäubert![-]";
+                        string feedbackMsg = $"[00FF00][Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}] POI '{poiName}' wurde restlos gesäubert![-]";
 
+                        // Schreibt die Nachricht in das lokale Chat-Fenster des Clients
                         GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
                     }
 
                     SimpleMinimap_Patch.ErzwingeRedraw = true;
-                }
-            }
-
-            // SICHERHEIT: Server-Relay für Multiplayer-Live-Sync
-            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer && !this.isLoginSync && this.syncPois.Count > 0)
-            {
-                foreach (var kvp in syncPois)
-                {
-                    SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(
-                        NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(kvp.Key, kvp.Value)
-                    );
-                    break; // Live-Sync betrifft immer nur einen POI
                 }
             }
         }
@@ -272,63 +259,55 @@ namespace EinmaligerSpawn.Network
         }
     }
 
-    // Sendet dem Client kontinuierlich die exakte Vector3-Koordinate des nächsten ungesäuberten Raums,
-    // damit das lokale Radar-System den 2D-Punkt oder 3D-Marker präzise in der Spielwelt platzieren kann.
+    // Sendet dem Client auf Anfrage die exakte Koordinate und den Radar-Typ (2D oder 3D).
     public class NetPackagePoiRadarUpdate : NetPackage
     {
-            private int poiId;
-            private Vector3 zielKoordinate;
+        private int poiId;
+        private Vector3 zielKoordinate;
+        private string markerKlasse;
 
-            // Leerer Konstruktor für die Engine
-            public NetPackagePoiRadarUpdate() { }
+        public NetPackagePoiRadarUpdate() { }
 
-            // Setup für den Versand durch den Server
-            public NetPackagePoiRadarUpdate Setup(int _poiId, Vector3 _zielKoordinate)
-            {
-                this.poiId = _poiId;
-                this.zielKoordinate = _zielKoordinate;
-                return this;
-            }
+        public NetPackagePoiRadarUpdate Setup(int _poiId, Vector3 _zielKoordinate, string _markerKlasse)
+        {
+            this.poiId = _poiId;
+            this.zielKoordinate = _zielKoordinate;
+            this.markerKlasse = _markerKlasse;
+            return this;
+        }
 
-            // Paket-Länge in Bytes (int = 4, Vector3 = 12 -> 16 Bytes)
-            public override int GetLength()
-            {
-                return 16;
-            }
+        public override int GetLength() { return 30; }
 
-            // Schreiben der Daten in den Stream (Server)
-            public override void write(PooledBinaryWriter _writer)
-            {
-                base.write(_writer);
-                System.IO.BinaryWriter baseWriter = _writer;
+        public override void write(PooledBinaryWriter _writer)
+        {
+            base.write(_writer);
+            System.IO.BinaryWriter baseWriter = _writer;
+            baseWriter.Write(this.poiId);
+            baseWriter.Write(this.zielKoordinate.x);
+            baseWriter.Write(this.zielKoordinate.y);
+            baseWriter.Write(this.zielKoordinate.z);
+            baseWriter.Write(this.markerKlasse);
+        }
 
-                baseWriter.Write(this.poiId);
-                baseWriter.Write(this.zielKoordinate.x);
-                baseWriter.Write(this.zielKoordinate.y);
-                baseWriter.Write(this.zielKoordinate.z);
-            }
+        public override void read(PooledBinaryReader _reader)
+        {
+            System.IO.BinaryReader baseReader = _reader;
+            this.poiId = baseReader.ReadInt32();
+            this.zielKoordinate = new Vector3(baseReader.ReadSingle(), baseReader.ReadSingle(), baseReader.ReadSingle());
+            this.markerKlasse = baseReader.ReadString();
+        }
 
-            // Lesen der Daten aus dem Stream (Client)
-            public override void read(PooledBinaryReader _reader)
-            {
-                System.IO.BinaryReader baseReader = _reader;
-
-                this.poiId = baseReader.ReadInt32(); // Hier baseReader nutzen
-                this.zielKoordinate = new Vector3(baseReader.ReadSingle(), baseReader.ReadSingle(), baseReader.ReadSingle());
-            }
-
-            // Ausführung, wenn das Paket ankommt
-            public override void ProcessPackage(World _world, GameManager _callbacks)
-            {
-                // Trägt die empfangene Koordinate ins "Gedächtnis" des Clients ein
-                if (_world == null) return;
-                PoiTracker.PoiRadarManager.ClientZiele[this.poiId] = this.zielKoordinate;
-
+        public override void ProcessPackage(World _world, GameManager _callbacks)
+        {
+            if (_world == null) return;
+            // Client trägt die Server-Antwort in sein lokales Gedächtnis ein
+            PoiTracker.PoiRadarManager.ClientZiele[this.poiId] = this.zielKoordinate;
+            PoiTracker.PoiRadarManager.ClientMarkerKlassen[this.poiId] = this.markerKlasse;
         }
     }
 
-// Der Client bittet den Server, einen POI zu überprüfen. Der Server entscheidet.
-public class NetPackageRequestPoiCheck : NetPackage
+    // Der Client bittet den Server, einen POI zu überprüfen. Der Server entscheidet.
+    public class NetPackageRequestPoiCheck : NetPackage
     {
         private int poiId;
         private byte requestedStatus;
@@ -359,7 +338,6 @@ public class NetPackageRequestPoiCheck : NetPackage
 
         public override void ProcessPackage(World _world, GameManager _callbacks)
         {
-            // SICHERHEIT: Nur der Server darf diese Prüfungen ausführen!
             if (!SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
 
             DynamicPrefabDecorator decorator = GameManager.Instance.GetDynamicPrefabDecorator();
@@ -368,7 +346,6 @@ public class NetPackageRequestPoiCheck : NetPackage
 
             if (this.requestedStatus == 1)
             {
-                // SERVER-VERIFIZIERUNG: Der Server zählt seine eigenen Sleeper-Volumen!
                 int totalValid = 0;
                 int clearedValid = 0;
                 if (poi.sleeperVolumes != null)
@@ -381,26 +358,18 @@ public class NetPackageRequestPoiCheck : NetPackage
                     }
                 }
 
-                // Wenn der Server bestätigt, dass der POI leer ist:
                 if (totalValid > 0 && clearedValid >= totalValid)
                 {
                     if (PoiDatenbank.LeseStatus(this.poiId) != 1)
                     {
                         PoiDatenbank.SetzeStatus(this.poiId, 1);
                         Log.Out($"[EinmaligerSpawn] Server-Prüfung bestätigt: POI '{poi.name}' ist leer (Status 1).");
-
-                        // Jetzt verteilt der Server den Status an alle Clients
                         SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(this.poiId, 1));
                     }
-                }
-                else
-                {
-                    Log.Warning($"[EinmaligerSpawn] Client-Meldung abgelehnt! POI '{poi.name}' ist serverseitig noch nicht leer.");
                 }
             }
             else if (this.requestedStatus == 2)
             {
-                // Quest ReadyForTurnIn: Quests werden vom Client verwaltet, wir vertrauen hier dem Besitzer der Quest.
                 if (PoiDatenbank.LeseStatus(this.poiId) == 0)
                 {
                     PoiDatenbank.SetzeStatus(this.poiId, 2);
@@ -408,12 +377,66 @@ public class NetPackageRequestPoiCheck : NetPackage
                     SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(this.poiId, 2));
                 }
             }
+            else if (this.requestedStatus == 3)
+            {
+                // RADAR-ANFRAGE: Server analysiert den Raum für den anfragenden Client
+                int totalValid = 0;
+                int clearedValid = 0;
+                bool hasUnclearedBossRoom = false;
+                SleeperVolume nextTarget = null;
+
+                if (poi.sleeperVolumes != null)
+                {
+                    foreach (SleeperVolume vol in poi.sleeperVolumes)
+                    {
+                        if (vol.IsTrigger || vol.isQuestExclude) continue;
+
+                        totalValid++;
+                        if (vol.wasCleared) clearedValid++;
+                        else
+                        {
+                            if (vol.isPriority) hasUnclearedBossRoom = true;
+                            if (nextTarget == null) nextTarget = vol;
+                        }
+                    }
+                }
+
+                if (totalValid > 0 && clearedValid >= totalValid)
+                {
+                    if (PoiDatenbank.LeseStatus(this.poiId) != 1)
+                    {
+                        PoiDatenbank.SetzeStatus(this.poiId, 1);
+                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(this.poiId, 1));
+                    }
+                }
+                else if (nextTarget != null && this.Sender != null)
+                {
+                    // Server entscheidet die Radar-Farbe basierend auf den echten Server-Zahlen
+                    string berechneteKlasse = "es_poi_map_only";
+                    if (poi.prefab != null && poi.prefab.DifficultyTier > 0)
+                    {
+                        byte poiStatus = PoiDatenbank.LeseStatus(poi.id);
+                        if (poiStatus == 2)
+                        {
+                            berechneteKlasse = "es_poi_local";
+                        }
+                        else
+                        {
+                            int remaining = totalValid - clearedValid;
+                            int threshold = (totalValid < 5) ? 1 : (totalValid < 10) ? 2 : (totalValid < 20) ? 3 : 4;
+                            if (!hasUnclearedBossRoom && remaining <= threshold)
+                            {
+                                berechneteKlasse = "es_poi_local";
+                            }
+                        }
+                    }
+
+                    // Antwort gezielt nur an den suchenden Client senden
+                    this.Sender.SendPackage(NetPackageManager.GetPackage<NetPackagePoiRadarUpdate>().Setup(this.poiId, nextTarget.Center, berechneteKlasse));
+                }
+            }
         }
 
-        public override int GetLength()
-        {
-            // 4 Bytes (Int32) + 1 Byte (Byte)
-            return 5;
-        }
+        public override int GetLength() { return 5; }
     }
 }

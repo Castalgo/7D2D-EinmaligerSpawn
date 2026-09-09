@@ -213,7 +213,7 @@ namespace EinmaligerSpawn.SpawnBlocker
                 Log.Warning($"[EinmaligerSpawn] POI '{poi.name}' (ID: {poi.id}) wurde restlos gesäubert!");
 
                 // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+                if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 1 || ModEinstellungen.ChatNachrichtenModus == 3))
                 {
                     ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
                     string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";

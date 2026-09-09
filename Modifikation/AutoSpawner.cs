@@ -183,6 +183,17 @@ namespace EinmaligerSpawn.ZombieSpawner
             GameRandom rand = GameManager.Instance.World.GetGameRandom();
             bool irgeneinChunkGeladen = false;
 
+            // Liste aller anderen lebenden Spieler auf dem Server zwischenspeichern, 
+            // damit wir sie nicht in jedem Schleifendurchlauf neu suchen müssen.
+            List<EntityPlayer> andereSpieler = new List<EntityPlayer>();
+            foreach (EntityPlayer p in GameManager.Instance.World.Players.list)
+            {
+                if (p.entityId != player.entityId && !p.IsDead())
+                {
+                    andereSpieler.Add(p);
+                }
+            }
+
             foreach (int radius in ScanRingPrioritaeten)
             {
                 List<Vector3i> ringChunks = new List<Vector3i>();
@@ -292,6 +303,7 @@ namespace EinmaligerSpawn.ZombieSpawner
                             Vector2 flatTarget = new Vector2(worldX, worldZ);
                             float flatDist = Vector2.Distance(flatPlayer, flatTarget);
 
+                            // Wenn der Punkt zu nah am Hauptspieler ist, schieben wir ihn weg
                             if (flatDist < 28f)
                             {
                                 Vector2 dir = (flatTarget - flatPlayer).normalized;
@@ -321,7 +333,20 @@ namespace EinmaligerSpawn.ZombieSpawner
                             int y = (int)(physChunk.GetHeight(physLocalX, physLocalZ) + 1);
                             Vector3 checkPosVec = new Vector3(worldX, (float)y, worldZ);
 
+                            // 1. Check: Hauptspieler
                             if (Vector3.Distance(checkPosVec, player.position) < 28f) continue;
+
+                            // 2. Check: ALLE anderen Spieler (NEU)
+                            bool zuNahAnAnderemSpieler = false;
+                            foreach (EntityPlayer p in andereSpieler)
+                            {
+                                if (Vector3.Distance(checkPosVec, p.position) < 28f)
+                                {
+                                    zuNahAnAnderemSpieler = true;
+                                    break;
+                                }
+                            }
+                            if (zuNahAnAnderemSpieler) continue;
 
                             PrefabInstance prefab = GameManager.Instance.World.GetPOIAtPosition(checkPosVec, null, null);
                             if (prefab != null) continue;
@@ -370,7 +395,6 @@ namespace EinmaligerSpawn.ZombieSpawner
             // Fehler-Reporting, falls kein Spawn durchgeführt werden konnte
             if (!irgeneinChunkGeladen)
             {
-                //Log.Out($"{logPrefix} Konnte keinen Zombie für '{player.EntityName}' erzeugen, weil keine Chunks infrage kommen.");
                 string aktuelleFehlermeldung = $"{logPrefix} Konnte keinen Zombie für '{player.EntityName}' erzeugen, weil keine Chunks infrage kommen.";
 
                 // Prüfen, ob für diesen Spieler schon exakt dieselbe Meldung geloggt wurde

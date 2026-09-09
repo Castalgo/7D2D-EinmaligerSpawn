@@ -170,8 +170,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
             if (localPlayer != null && localPlayer.entityId == _entityId)
             {
                 // Karte basierend auf der geladenen Config aktualisieren
-                Log.Out("[EinmaligerSpawn] Karte wiederherstellen...");
-                KartenOverlay.Wiederherstellen();
+                ThreadManager.StartCoroutine(VerzoegerterMapRedraw());
 
                 // Lokalen Buff beim Spawnen aufräumen, falls deaktiviert
                 if (!ModEinstellungen.ZeigeLokalenFortschritt)
@@ -194,6 +193,20 @@ namespace EinmaligerSpawn.SaveLoadPatches
             }
 
             Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Postfix - Ende");
+
+
+        }
+
+        // Die neue Hintergrund-Routine
+        private static System.Collections.IEnumerator VerzoegerterMapRedraw()
+        {
+            // Pausiert diese spezifische Methode für 5 Sekunden, das restliche Spiel läuft normal weiter
+            yield return new UnityEngine.WaitForSeconds(5f);
+
+            KartenOverlay.Wiederherstellen();
+            KartenOverlay.ErzwingeRedraw();
+
+            Log.Out("[EinmaligerSpawn] Late-Init (Verzögert): Kartenoverlay wurde nach 5 Sekunden erfolgreich geladen.");
         }
     }
 }

@@ -15,7 +15,7 @@ The mod tracks when you have cleared a chunk or a POI of zombies and permanently
 
 **Important for Multiplayer:** This mod communicates via its own custom network packages and therefore **must be installed on both the server and all clients**. The mod does not support EAC, which means the server must have EAC disabled.
 
-## The Graphical In-Game Menu (New)
+## The Graphical In-Game Menu
 Almost all functions of the mod can now be conveniently controlled via a custom UI menu.
 *   **Access:** Open the in-game map and click the "Show ES Menu" button at the top.
 *   **Client Section:** Local control over the map overlay, radar, HUD progress buff, and chat messages.

@@ -84,19 +84,19 @@
     <Compile Include="Modifikation\DynamischesSpawnLimit.cs" />
     <Compile Include="Main.cs" />
     <Compile Include="Modifikation\FortschrittsBuff.cs" />
+    <Compile Include="Modifikation\KonsolenBefehle.cs" />
     <Compile Include="Modifikation\Minimap_Patch.cs" />
     <Compile Include="Modifikation\Network.cs" />
     <Compile Include="Modifikation\POI_Tracker.cs" />
     <Compile Include="Modifikation\SpawnBlocker.cs" />
     <Compile Include="Modifikation\KillCounter.cs" />
     <Compile Include="Modifikation\KartenOverlay.cs" />
-    <Compile Include="Modifikation\KonsolenBefehle.cs" />
     <Compile Include="Modifikation\LokalenChunkSaeubern.cs" />
     <Compile Include="Modifikation\ModEinstellungen.cs" />
+    <Compile Include="Modifikation\TodesListener_Patch.cs" />
     <Compile Include="Modifikation\Trader_Quest_Filter_Patch.cs" />
     <Compile Include="Modifikation\POI_Sleeper_Kontrolle.cs" />
     <Compile Include="Modifikation\SpeichernLaden_Patch.cs" />
-    <Compile Include="Modifikation\TodesListener_Patch.cs" />
     <Compile Include="Modifikation\XUiC_ModEinstellungen.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

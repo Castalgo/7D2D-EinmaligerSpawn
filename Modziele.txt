@@ -30,3 +30,5 @@ Idee für zukünftige Erweiterung
 - Welteroberung: um unspawnbare Chunks bereinigen
 
 - Spiel beitreten: Freeze-Grund bestimmen und fixen
+
+- Spawndistanz im MP

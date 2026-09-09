@@ -153,7 +153,7 @@ namespace EinmaligerSpawn.LocalClear
             Log.Warning($"[EinmaligerSpawn] Walkthrough-Clear: Chunk {chunkId} wurde durch friedliche Präsenz von '{player.EntityName}' gesäubert.");
 
             // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-            if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenAktiv)
+            if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3))
             {
                 ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
                 string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
