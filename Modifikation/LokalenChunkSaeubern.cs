@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using EinmaligerSpawn.Benachrichtigungen;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
-using EinmaligerSpawn.KartenOverlayManager;
-using EinmaligerSpawn.Minimap_Patch;
-using EinmaligerSpawn.Network;
 using UnityEngine;
 
 namespace EinmaligerSpawn.LocalClear
@@ -120,10 +118,10 @@ namespace EinmaligerSpawn.LocalClear
         // Server only: Prüft, ob der Chunk gesäubert werden kann, und markiert ihn als gesäubert
         private static bool PruefeUndSaeubere(string chunkId, EntityPlayer player)
         {
-            if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId) && ChunkClearManager.ChunkClearLevel[chunkId] >= 1)
+            if (ChunkClearManager.GetChunkLevel(chunkId) >= 1)
                 return false;
 
-            if (ChunkClearManager.ZombieUrsprung.ContainsValue(chunkId))
+            if (ChunkClearManager.IstChunkAktivBelegt(chunkId))
                 return false;
 
             foreach (Entity ent in GameManager.Instance.World.Entities.list)
@@ -148,29 +146,18 @@ namespace EinmaligerSpawn.LocalClear
                 }
             }
 
-            ChunkClearManager.ChunkClearLevel[chunkId] = 1;
+            // Kapselung: Speichert den Status, triggert Network-Sync und Minimap-Update
+            ChunkClearManager.VerarbeiteScannerBatch(new List<string> { chunkId }, 1);
 
             Log.Warning($"[EinmaligerSpawn] Walkthrough-Clear: Chunk {chunkId} wurde durch friedliche Präsenz von '{player.EntityName}' gesäubert.");
 
-            // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-            if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3))
-            {
-                ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+            // Wir nutzen hier das globale Notification-Paket, da diese Nachricht unabhängig von der Einstellung 
+            // immer ausgegeben werden soll (es handelt sich quasi um einen Server-Log, der aber im Chat steht).
+            ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
+            string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+            string feedbackMsg = $"[00FF00][{timeString}] Walkthrough-Clear: Chunk {chunkId} wurde durch friedliche Präsenz von '{player.EntityName}' gesäubert.[-]";
 
-                // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
-                string feedbackMsg = $"[00FF00][{timeString}] Walkthrough-Clear: Chunk {chunkId} wurde durch friedliche Präsenz von '{player.EntityName}' gesäubert.[-]";
-
-                GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
-            }
-
-            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
-            {
-                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
-            }
-
-            // erzwingt Minimap Update, sofern Minimap Mod aktiv
-            SimpleMinimap_Patch.ErzwingeRedraw = true;
+            NotificationManager.SendeGlobaleNachricht(feedbackMsg);
 
             return true;
         }
@@ -189,7 +176,8 @@ namespace EinmaligerSpawn.LocalClear
                 SingletonMonoBehaviour<SdtdConsole>.Instance.Output(text);
                 if (fromUI)
                 {
-                    GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, text, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                    // Kapselung: Zentrale UI-Benachrichtigung
+                    NotificationManager.SendeGlobaleNachricht(text);
                 }
             }
 
@@ -210,9 +198,9 @@ namespace EinmaligerSpawn.LocalClear
             int cz = pos.z >> 4;
             string chunkId = $"{cx}_{cz}";
 
-            if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId) && ChunkClearManager.ChunkClearLevel[chunkId] >= 1)
+            if (ChunkClearManager.GetChunkLevel(chunkId) >= 1)
             {
-                int kills = ChunkClearManager.ChunkClearLevel[chunkId];
+                int kills = ChunkClearManager.GetChunkLevel(chunkId);
                 OutputMsg($"[EinmaligerSpawn] Diagnose für {player.EntityName}: Dieser Chunk ({chunkId}) ist bereits als gesäubert markiert! Registrierte Kills hier: {kills}");
                 return;
             }
@@ -229,7 +217,8 @@ namespace EinmaligerSpawn.LocalClear
                     bool istBlockierer = false;
                     EntityAlive enemyAlive = ent as EntityAlive;
 
-                    if (ChunkClearManager.ZombieUrsprung.TryGetValue(ent.entityId, out string uChunk) && uChunk == chunkId)
+                    string uChunk = ChunkClearManager.GetUrsprungsChunkLebenderZombie(ent.entityId);
+                    if (uChunk != null && uChunk == chunkId)
                     {
                         ursprungGefunden = true;
                         istBlockierer = true;

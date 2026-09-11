@@ -15,11 +15,17 @@ namespace EinmaligerSpawn.KartenOverlayManager
         public static bool IstAktiv { get; private set; } = false;
         public static XUiC_MapArea AktuelleMapArea { get; set; } = null;
 
-        // --- NEU: Tracking für die gelben Chunks ---
+        // Türsteher-Prinzip: Dictionary ist nun privat
         private static HashSet<string> knownClearedChunks = new HashSet<string>();
-        public static Dictionary<string, float> NeuGeclearteChunks = new Dictionary<string, float>();
+        private static Dictionary<string, float> neuGeclearteChunks = new Dictionary<string, float>();
         private static bool isInitialized = false;
         private static float nextUpdate = 0f;
+
+        // Kapselung für den Harmony-Patch
+        public static bool IstChunkNeuGecleart(string chunkId)
+        {
+            return neuGeclearteChunks.ContainsKey(chunkId);
+        }
 
         // Der lokale Hintergrund-Tracker
         public static void OnGameUpdate()
@@ -32,12 +38,12 @@ namespace EinmaligerSpawn.KartenOverlayManager
             bool needsRedraw = false;
 
             // 1. Bereinigung: Falls Chunks per Admin-Cheat 'reset' zurückgesetzt wurden
-            if (knownClearedChunks.Count > ChunkClearManager.ChunkClearLevel.Count)
+            if (knownClearedChunks.Count > ChunkClearManager.GetDatenbankGroesse())
             {
                 List<string> removed = new List<string>();
                 foreach (string key in knownClearedChunks)
                 {
-                    if (!ChunkClearManager.ChunkClearLevel.ContainsKey(key) || ChunkClearManager.ChunkClearLevel[key] < 1)
+                    if (ChunkClearManager.GetChunkLevel(key) < 1)
                     {
                         removed.Add(key);
                     }
@@ -45,22 +51,22 @@ namespace EinmaligerSpawn.KartenOverlayManager
                 foreach (string key in removed)
                 {
                     knownClearedChunks.Remove(key);
-                    NeuGeclearteChunks.Remove(key);
+                    neuGeclearteChunks.Remove(key);
                     needsRedraw = true; // Karte aktualisieren, da der Chunk wieder unsichtbar wird
                 }
             }
 
-            // 2. Suche nach NEUEN Chunks
-            foreach (var kvp in ChunkClearManager.ChunkClearLevel)
+            // 2. Suche nach NEUEN Chunks über die Wrapper-Methode
+            foreach (string chunkId in ChunkClearManager.GetAlleGesperrtenChunks())
             {
-                if (kvp.Value >= 1 && !knownClearedChunks.Contains(kvp.Key))
+                if (!knownClearedChunks.Contains(chunkId))
                 {
-                    knownClearedChunks.Add(kvp.Key);
+                    knownClearedChunks.Add(chunkId);
 
                     // Nur gelb färben, wenn das Spiel bereits initial geladen wurde (verhindert komplett gelbe Map beim Login)
                     if (isInitialized)
                     {
-                        NeuGeclearteChunks[kvp.Key] = Time.time;
+                        neuGeclearteChunks[chunkId] = Time.time;
                     }
                 }
             }
@@ -68,7 +74,7 @@ namespace EinmaligerSpawn.KartenOverlayManager
 
             // 3. Suche nach ABGELAUFENEN Chunks (20 Sekunden)
             List<string> expired = new List<string>();
-            foreach (var kvp in NeuGeclearteChunks)
+            foreach (var kvp in neuGeclearteChunks)
             {
                 if (Time.time - kvp.Value >= 20f)
                 {
@@ -80,13 +86,41 @@ namespace EinmaligerSpawn.KartenOverlayManager
             // Löschen der abgelaufenen Chunks
             foreach (string key in expired)
             {
-                NeuGeclearteChunks.Remove(key);
+                neuGeclearteChunks.Remove(key);
             }
 
             // Map Redraw feuern, wenn sich an den Farben etwas geändert hat
-            if (needsRedraw && IstAktiv && AktuelleMapArea != null)
+            if (needsRedraw)
+            {
+                RequestMapUpdate();
+            }
+        }
+
+        // ==================================================================================
+        // ZENTRALER MAP-UPDATER
+        // ==================================================================================
+        public static void RequestMapUpdate()
+        {
+            // 1. Dedicated Server abfangen: Sie haben kein lokales UI.
+            // Die Berechnung der Marker/Daten läuft im Hintergrund ohnehin unabhängig hiervon weiter.
+            if (GameManager.IsDedicatedServer) return;
+
+            // 2. Große Weltkarte aktualisieren (nur wenn in den Mod-Einstellungen aktiv)
+            if (IstAktiv)
             {
                 ErzwingeRedraw();
+            }
+
+            // 3. Kleine Minimap aktualisieren (Patch regelt eigene Sicherheitsabfragen)
+            EinmaligerSpawn.Minimap_Patch.SimpleMinimap_Patch.ErzwingeRedraw = true;
+        }
+
+        // Kapselung: Die alte Methode ist nun privat und wird nur noch von innen gesteuert
+        private static void ErzwingeRedraw()
+        {
+            if (AktuelleMapArea != null)
+            {
+                AktuelleMapArea.bShouldRedrawMap = true;
             }
         }
 
@@ -94,7 +128,7 @@ namespace EinmaligerSpawn.KartenOverlayManager
         public static void Reset()
         {
             knownClearedChunks.Clear();
-            NeuGeclearteChunks.Clear();
+            neuGeclearteChunks.Clear();
             isInitialized = false;
         }
 
@@ -106,13 +140,13 @@ namespace EinmaligerSpawn.KartenOverlayManager
             ModEinstellungen.KartenOverlayAktiv = IstAktiv;
             ModEinstellungen.Speichern();
 
-            ErzwingeRedraw();
+            RequestMapUpdate();
             Log.Out($"[EinmaligerSpawn] Karten-Overlay {(aktiv ? "AKTIVIERT" : "DEAKTIVIERT")}.");
         }
 
         public static void Reload()
         {
-            ErzwingeRedraw();
+            RequestMapUpdate();
             Log.Out("[EinmaligerSpawn] Karten-Redraw erzwungen.");
         }
 
@@ -121,20 +155,10 @@ namespace EinmaligerSpawn.KartenOverlayManager
             IstAktiv = ModEinstellungen.KartenOverlayAktiv;
         }
 
-        public static void ErzwingeRedraw()
-        {
-            if (AktuelleMapArea != null)
-            {
-                AktuelleMapArea.bShouldRedrawMap = true;
-            }
-        }
-
         // Berechnet den globalen Fortschritt: Anzahl der gesperrten Chunks / Gesamtanzahl der Chunks
         public static (int gesperrt, int gesamt, string prozentString) BerechneGlobalenFortschritt()
         {
-            // +++ NEUE STATISCHE LOGIK EINFÜGEN +++
-            // Wir greifen auf die festen Welt-Metadaten der V3-Architektur zu, 
-            // exakt wie im GlobalMapScanner!
+            // Zugriff auf die festen Welt-Metadaten der V3-Architektur, exakt wie im GlobalMapScanner
             IChunkProvider chunkProvider = GameManager.Instance.World.ChunkCache.ChunkProvider;
             GameUtils.WorldInfo worldInfo = ((ChunkProviderAbstract)chunkProvider).WorldInfo;
 
@@ -145,13 +169,10 @@ namespace EinmaligerSpawn.KartenOverlayManager
             int y_Gesamt = (weltGroesseX / 16) * (weltGroesseZ / 16);
             int x_Gesperrt = 0;
 
-            // Wir greifen über ChunkClearManager auf das Dictionary zu
-            foreach (var kvp in ChunkClearManager.ChunkClearLevel)
+            // Kapselung: Zählen der übergebenen geclearten Chunks ohne direkten Dictionary-Zugriff
+            foreach (string chunkId in ChunkClearManager.GetAlleGesperrtenChunks())
             {
-                if (kvp.Value >= 1)
-                {
-                    x_Gesperrt++;
-                }
+                x_Gesperrt++;
             }
 
             // Prozentwert berechnen und mit 2 Nachkommastellen als String formatieren
@@ -276,10 +297,11 @@ namespace EinmaligerSpawn.KartenOverlayManager
                     int chunkZ = World.toChunkXZ(zWelt);
                     string chunkId = $"{chunkX}_{chunkZ}";
 
-                    if (ChunkClearManager.ChunkClearLevel.TryGetValue(chunkId, out int kills) && kills >= 1)
+                    // Abfrage über die neue Getter-Methode des ChunkClearManagers
+                    if (ChunkClearManager.GetChunkLevel(chunkId) >= 1)
                     {
-                        // NEU: Ist dieser Chunk frisch gecleart (und soll gelb leuchten)?
-                        bool isNeuGecleart = KartenOverlay.NeuGeclearteChunks.ContainsKey(chunkId);
+                        // Abfrage nun über sicheren Getter
+                        bool isNeuGecleart = KartenOverlay.IstChunkNeuGecleart(chunkId);
 
                         for (int pixelIndex = 0; pixelIndex < 256; pixelIndex++)
                         {

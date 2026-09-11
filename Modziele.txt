@@ -29,8 +29,6 @@ Idee für zukünftige Erweiterung
 - "easy_clean": Abstand zum nähesten lebenden Zombie (oder ID bei den lebenden) -23 Meter immer als clear setzen + config = default aus, maximal 120 minus 23 (also 97 Meter) weit cleanen dürfen
 - Welteroberung: um unspawnbare Chunks bereinigen
 
-- Spiel beitreten: Freeze-Grund bestimmen und fixen
+- Spiel beitreten: Freeze-Grund bestimmen und fixen --> sieht nach 
 
-- Spawndistanz im MP
-
-- POI Name auf ANzeigename ändern, sofern vorhanden (aber nur in den notifications)
+- POI Name auf Anzeigename ändern, sofern vorhanden (aber nur in den notifications, nicht im Log [im Log muss beides stehen]

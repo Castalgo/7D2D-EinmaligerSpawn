@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using EinmaligerSpawn.Benachrichtigungen;
 using EinmaligerSpawn.Config;
-using EinmaligerSpawn.Minimap_Patch;
+using EinmaligerSpawn.JSONSpeichern;
+using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.Network;
 using HarmonyLib;
 using Newtonsoft.Json;
@@ -13,19 +15,19 @@ namespace EinmaligerSpawn.PoiTracker
     // Verwaltet den Status der gesäuberten POIs ressourcenschonend über deren eindeutige ID.
     public static class PoiDatenbank
     {
-        // Speichert: PrefabInstance.id -> Status (0 = Aktiv, 1 = 100% Gecleart, 2 = Quest-Sperre)
-        public static Dictionary<int, byte> PoiZustaende = new Dictionary<int, byte>();
+        // Türsteher-Prinzip: Dictionary ist nun privat
+        private static Dictionary<int, byte> poiZustaende = new Dictionary<int, byte>();
 
         // Setzt einen spezifischen Status für den POI
         public static void SetzeStatus(int poiId, byte status)
         {
-            PoiZustaende[poiId] = status;
+            poiZustaende[poiId] = status;
         }
 
         // Liest den aktuellen Status aus (Standardwert ist 0)
         public static byte LeseStatus(int poiId)
         {
-            return PoiZustaende.TryGetValue(poiId, out byte status) ? status : (byte)0;
+            return poiZustaende.TryGetValue(poiId, out byte status) ? status : (byte)0;
         }
 
         // Hilfsmethode für das Radar: Reagiert nur auf 100 % gesäuberte Gebäude
@@ -34,42 +36,63 @@ namespace EinmaligerSpawn.PoiTracker
             return LeseStatus(poiId) == 1;
         }
 
+        public static void VerarbeitePoiStatus(int poiId, byte status)
+        {
+            SetzeStatus(poiId, status);
+
+            if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+            {
+                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(
+                    NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poiId, status)
+                );
+            }
+
+            // Wenn das Gebäude komplett ausgerottet wurde, erzwingen wir ein Karten-Update
+            if (status == 1)
+            {
+                // Kapselung: Zentrales Map-Update für Minimap & Weltkarte
+                KartenOverlay.RequestMapUpdate();
+            }
+        }
+
+        // ==========================================
+        // ITERATOREN & SYSTEM (Neu)
+        // ==========================================
+        public static IEnumerable<int> GetAllePoiIds()
+        {
+            foreach (int id in poiZustaende.Keys)
+            {
+                yield return id;
+            }
+        }
+
+        public static void Reset()
+        {
+            poiZustaende.Clear();
+        }
+
         // Nur Server: Lädt die POI-Datenbank aus der JSON-Datei
         public static void Load(string saveDir)
         {
             string path = Path.Combine(saveDir, "ausgerottetePOIs.json");
-            if (File.Exists(path))
+
+            if (SicheresSpeichern.TryLoad(path, out Dictionary<int, byte> geladeneDaten))
             {
-                try
-                {
-                    string json = File.ReadAllText(path);
-                    PoiZustaende = JsonConvert.DeserializeObject<Dictionary<int, byte>>(json) ?? new Dictionary<int, byte>();
-                    Log.Out($"[EinmaligerSpawn] {PoiZustaende.Count} POI-Daten erfolgreich geladen.");
-                }
-                catch (Exception e)
-                {
-                    Log.Error($"[EinmaligerSpawn] Fehler beim Laden der POIs: {e.Message}");
-                }
+                poiZustaende = geladeneDaten;
+                Log.Out($"[EinmaligerSpawn] {poiZustaende.Count} POI-Daten erfolgreich geladen.");
             }
             else
             {
-                PoiZustaende.Clear();
+                poiZustaende.Clear();
+                Log.Out("[EinmaligerSpawn] Beginne mit leerer POI-Datenbank.");
             }
         }
 
         // Nur Server: Speichert die POI-Datenbank in einer JSON-Datei
         public static void Save(string saveDir)
         {
-            try
-            {
-                string path = Path.Combine(saveDir, "ausgerottetePOIs.json");
-                string json = JsonConvert.SerializeObject(PoiZustaende, Formatting.Indented);
-                File.WriteAllText(path, json);
-            }
-            catch (Exception e)
-            {
-                Log.Error($"[EinmaligerSpawn] Fehler beim Speichern der POIs: {e.Message}");
-            }
+            string path = Path.Combine(saveDir, "ausgerottetePOIs.json");
+            SicheresSpeichern.Save(path, poiZustaende);
         }
     }
 
@@ -233,18 +256,11 @@ namespace EinmaligerSpawn.PoiTracker
                         {
                             if (PoiDatenbank.LeseStatus(poi.id) != 1)
                             {
-                                PoiDatenbank.SetzeStatus(poi.id, 1);
-                                
-                                // LOKALE NACHRICHT FÜR DEN EINZELSPIELER
-                                if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 1 || ModEinstellungen.ChatNachrichtenModus == 3))
-                                {
-                                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                                    string feedbackMsg = $"[00FF00][Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}] POI {poi.name} wurde restlos gesäubert![-]";
-                                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
-                                }
+                                // Kapselung: Ersetzt SetzeStatus, NetPackage-Aufruf und Map-Redraw
+                                PoiDatenbank.VerarbeitePoiStatus(poi.id, 1);
 
-                                SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id, 1));
-                                SimpleMinimap_Patch.ErzwingeRedraw = true;
+                                // Kapselung: Zentrale UI-Benachrichtigung
+                                NotificationManager.SendePoiClear(poi.name);
                             }
                             continue; // Marker löschen
                         }

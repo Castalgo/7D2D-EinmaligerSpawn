@@ -2,57 +2,84 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using EinmaligerSpawn.Config;
-using EinmaligerSpawn.Minimap_Patch;
+using EinmaligerSpawn.Benachrichtigungen;
+using EinmaligerSpawn.JSONSpeichern;
+using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.Network;
-using Newtonsoft.Json;
 
 namespace EinmaligerSpawn.ChunkDatenbank
 {
     public static class ChunkClearManager
     {
-        // Speichert die Anzahl der GETÖTETEN Zombies pro Chunk
-        public static Dictionary<string, int> ChunkClearLevel = new Dictionary<string, int>();
+        // Türsteher-Prinzip: Beide Dictionaries sind nun strikt privat
+        private static Dictionary<string, int> chunkClearLevel = new Dictionary<string, int>();
+        private static Dictionary<int, string> ursprungsChunksLebenderZombies = new Dictionary<int, string>();
 
-        // Das temporäre Gedächtnis (Entity-ID -> Ursprungs-Chunk-ID)
-        public static Dictionary<int, string> ZombieUrsprung = new Dictionary<int, string>();
+        // ==========================================
+        // 1. HILFSMETHODEN
+        // ==========================================
 
         public static string GetChunkId(Vector3i pos)
         {
             return $"{pos.x >> 4}_{pos.z >> 4}";
         }
 
-        // Nur Server: Zählt einen Kill direkt über die Chunk-ID hoch
-        public static void AddToterZombieNachID(string chunkId, int maxZombies)
+        public static int GetChunkLevel(string chunkId)
         {
-            if (!ChunkClearLevel.ContainsKey(chunkId))
+            if (chunkClearLevel.TryGetValue(chunkId, out int level))
             {
-                ChunkClearLevel[chunkId] = 0;
+                return level;
+            }
+            return 0;
+        }
+
+        // ==========================================
+        // 2. LIVE-TRACKING (LEBENDE ZOMBIES)
+        // ==========================================
+
+        public static void AddUrsprungsChunkLebenderZombie(int entityId, string chunkId)
+        {
+            ursprungsChunksLebenderZombies[entityId] = chunkId;
+        }
+
+        public static string GetUrsprungsChunkLebenderZombie(int entityId)
+        {
+            if (ursprungsChunksLebenderZombies.TryGetValue(entityId, out string chunkId))
+            {
+                return chunkId;
+            }
+            return null;
+        }
+
+        public static void RemoveUrsprungsChunkLebenderZombie(int entityId)
+        {
+            ursprungsChunksLebenderZombies.Remove(entityId);
+        }
+
+        // ==========================================
+        // 3. CHUNK-STATUS & KILLS (AKTIONEN)
+        // ==========================================
+
+        // Ersetzt AddToterZombieNachID
+        public static void AddRegulaerenKill(string chunkId)
+        {
+            if (!chunkClearLevel.ContainsKey(chunkId))
+            {
+                chunkClearLevel[chunkId] = 0;
             }
 
-            ChunkClearLevel[chunkId]++;
-
-            // Kompromisslose Rückeroberung: Wildnis-Chunks verriegeln nach exakt 1 Kill.
+            chunkClearLevel[chunkId]++;
             int abriegelungsLimit = 1;
 
-            if (ChunkClearLevel[chunkId] == abriegelungsLimit)
+            if (chunkClearLevel[chunkId] == abriegelungsLimit)
             {
                 Log.Warning($"[EinmaligerSpawn] ERFOLG! Chunk {chunkId} zählt jetzt als dauerhaft ausgerottet!");
 
-                // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-                if (!GameManager.IsDedicatedServer && ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3)
-                {
-                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                    string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+                // Kapselung: Zentrale UI-Benachrichtigung
+                NotificationManager.SendeChunkClear(chunkId);
 
-                    // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
-                    string feedbackMsg = $"[00FF00][{timeString}] Gebiet {chunkId} wurde dauerhaft gesäubert![-]";
-
-                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
-                }
-
-                // erzwingt Minimap Update, sofern Minimap Mod aktiv
-                SimpleMinimap_Patch.ErzwingeRedraw = true;
+                // Kapselung: Zentrales Map-Update für Minimap & Weltkarte
+                KartenOverlay.RequestMapUpdate();
 
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
@@ -61,123 +88,119 @@ namespace EinmaligerSpawn.ChunkDatenbank
             }
         }
 
-        // Nur Server: Verarbeitet die taktischen Kills (Nachbar-Clear oder Gekitet) sauber an einem Ort
-        public static void VerbucheTaktischenKill(string chunkId, bool istNachbar)
+        // Ersetzt VerbucheTaktischenKill
+        public static void AddTaktischenKill(string chunkId, bool istNachbar)
         {
-            // Sicherheitsprüfung: Falls der Chunk ohnehin schon leer ist, nur hochzählen
-            if (ChunkClearLevel.ContainsKey(chunkId) && ChunkClearLevel[chunkId] >= 1)
+            if (chunkClearLevel.ContainsKey(chunkId) && chunkClearLevel[chunkId] >= 1)
             {
-                ChunkClearLevel[chunkId]++;
+                chunkClearLevel[chunkId]++;
                 return;
             }
 
-            // Chunk auf gesäubert setzen
-            ChunkClearLevel[chunkId] = 1;
+            chunkClearLevel[chunkId] = 1;
 
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
                 SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
             }
 
-            if (istNachbar)
-            {
-                Log.Warning($"[EinmaligerSpawn] Taktischer Bonus: Nachbar {chunkId} zusätzlich gesichert!");
+            string logMsg = istNachbar ? $"Nachbar {chunkId} zusätzlich gesichert!" : $"Todes-Chunk {chunkId} wurde gesichert.";
+            Log.Warning($"[EinmaligerSpawn] Taktischer Bonus: {logMsg}");
 
-                // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-                if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3))
-                {
-                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                    string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
+            // Kapselung: Zentrale UI-Benachrichtigung
+            NotificationManager.SendeTaktischenKill(chunkId, istNachbar);
 
-                    // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
-                    string feedbackMsg = $"[00FF00][{timeString}] Taktischer Clear: Nachbar {chunkId} wurde zusätzlich gesichert![-]";
-
-                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
-                }
-            }
-            else
-            {
-                Log.Warning($"[EinmaligerSpawn] Taktischer Clear! Todes-Chunk {chunkId} wurde gesichert.");
-
-                // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-                if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3))
-                {
-                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                    string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
-
-                    // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
-                    string feedbackMsg = $"[00FF00][{timeString}] Taktischer Clear: Todes-Ort {chunkId} wurde gesäubert![-]";
-
-                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
-                }
-            }
-
-            // erzwingt Minimap Update, sofern Minimap Mod aktiv
-            SimpleMinimap_Patch.ErzwingeRedraw = true;
-
+            // Kapselung: Zentrales Map-Update für Minimap & Weltkarte
+            KartenOverlay.RequestMapUpdate();
         }
 
-        // Nur Server: Prüft, ob in diesem Chunk noch gespawnt werden darf
-        public static bool IstChunkAusgerottet(Vector3i pos, int maxZombies)
+        public static void VerarbeiteScannerBatch(List<string> chunkIds, int level)
         {
-            string id = GetChunkId(pos);
-            if (ChunkClearLevel.ContainsKey(id))
+            foreach (string chunkId in chunkIds)
             {
-                // Sobald auch nur 1 Kill registriert wurde, blockiert der Chunk neue Biom-Spawns
-                return ChunkClearLevel[id] >= 1;
-            }
-            return false;
-        }
+                chunkClearLevel[chunkId] = level;
 
-        // Nur Server: Lädt die Chunk-Datenbank aus der JSON-Datei
-        public static void Load(string saveDir)
-        {
-            string path = Path.Combine(saveDir, "ausgerotteteChunks.json");
-            if (File.Exists(path))
-            {
-                try
+                if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
-                    string json = File.ReadAllText(path);
-                    ChunkClearLevel = JsonConvert.DeserializeObject<Dictionary<string, int>>(json) ?? new Dictionary<string, int>();
-                    Log.Out($"[EinmaligerSpawn] {ChunkClearLevel.Count} Chunk-Daten erfolgreich geladen.");
-                }
-                catch (Exception e)
-                {
-                    Log.Error($"[EinmaligerSpawn] Fehler beim Laden der Chunks: {e.Message}");
+                    SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
                 }
             }
-            else
-            {
-                ChunkClearLevel.Clear();
-            }
+
+            // Kapselung: Zentrales Map-Update für Minimap & Weltkarte
+            KartenOverlay.RequestMapUpdate();
         }
 
-        // Nur Server: Speichert die Chunk-Datenbank in einer JSON-Datei
-        public static void Save(string saveDir)
+        public static void VerarbeiteAdminBefehl(List<string> chunkIds, bool isReset)
         {
-            try
+            bool datenGeaendert = false;
+
+            foreach (string chunkId in chunkIds)
             {
-                string path = Path.Combine(saveDir, "ausgerotteteChunks.json");
+                if (isReset)
+                {
+                    if (chunkClearLevel.ContainsKey(chunkId))
+                    {
+                        chunkClearLevel.Remove(chunkId);
+                        datenGeaendert = true;
+                    }
+                }
+                else
+                {
+                    if (!chunkClearLevel.ContainsKey(chunkId))
+                    {
+                        chunkClearLevel[chunkId] = 0;
+                    }
+                    chunkClearLevel[chunkId]++;
+                    datenGeaendert = true;
 
-                // Hochperformante Sortierung (IntroSort) speziell für riesige Listen beim Speichern
-                var sortedChunks = ChunkClearLevel
-                    .OrderBy(kvp => kvp.Key)
-                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-
-                string json = JsonConvert.SerializeObject(sortedChunks, Formatting.Indented);
-                File.WriteAllText(path, json);
+                    if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                    {
+                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
+                    }
+                }
             }
-            catch (Exception e)
+
+            if (datenGeaendert)
             {
-                Log.Error($"[EinmaligerSpawn] Fehler beim Speichern der Chunks: {e.Message}");
+                // Kapselung: Zentrales Map-Update für Minimap & Weltkarte
+                KartenOverlay.RequestMapUpdate();
+
+                if (isReset)
+                {
+                    //// "ESa Cheat_Clear Reset" ist ein reiner Debugging-Befehl, der im Regelbetrieb nicht nötig sein sollte. Daher ist es in Ordnung, dass wir hier nur eine Warnung ausgeben, statt zu synchronisieren.
+                    int spielerAnzahl = GameManager.Instance.World.Players.list.Count;
+                    bool hatExterneClients = GameManager.IsDedicatedServer ? spielerAnzahl > 0 : spielerAnzahl > 1;
+
+                    if (hatExterneClients)
+                    {
+                        string warnMsg = "[FFFF00]Warnung: Ein Chunk-Reset wurde durchgeführt! Eure lokalen Karten-Daten sind nun asynchron. Bitte verbindet euch einmal neu, um das Problem zu beheben.[-]";
+                        // Kapselung: Zentrale UI-Benachrichtigung
+                        NotificationManager.SendeGlobaleNachricht(warnMsg);
+                    }
+                }
             }
         }
 
-        // Client: Berechnet den prozentualen Clear-Status in einem bestimmten Umkreis
+        public static int GetAnzahlLebenderZombies()
+        {
+            return ursprungsChunksLebenderZombies.Count;
+        }
+
+        public static IEnumerable<int> GetAlleLebendenZombieIDs()
+        {
+            foreach (int id in ursprungsChunksLebenderZombies.Keys)
+            {
+                yield return id;
+            }
+        }
+
+        // ==========================================
+        // 4. LESE-ZUGRIFFE & AUSWERTUNG
+        // ==========================================
+
         public static (int gesamt, int gesperrt, float prozent) BerechneLokalenFortschritt(int centerChunkX, int centerChunkZ, int radiusMeter)
         {
             int chunkSuchRadius = UnityEngine.Mathf.CeilToInt((float)radiusMeter / 16f);
-
             int gesamtChunks = 0;
             int gesperrteChunks = 0;
 
@@ -188,7 +211,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
                     gesamtChunks++;
                     string chunkId = $"{cx}_{cz}";
 
-                    if (ChunkClearLevel.TryGetValue(chunkId, out int kills) && kills > 0)
+                    if (GetChunkLevel(chunkId) > 0)
                     {
                         gesperrteChunks++;
                     }
@@ -199,21 +222,81 @@ namespace EinmaligerSpawn.ChunkDatenbank
             return (gesamtChunks, gesperrteChunks, prozent);
         }
 
-        // Entfernt alle Einträge mit 0 Kills aus der Datenbank
+        public static bool HatChunkEintrag(string chunkId) { return chunkClearLevel.ContainsKey(chunkId); }
+
+        public static bool IstChunkAktivBelegt(string chunkId) { return ursprungsChunksLebenderZombies.ContainsValue(chunkId); }
+
+        public static int GetDatenbankGroesse() { return chunkClearLevel.Count; }
+
+        public static IEnumerable<string> GetAlleGesperrtenChunks()
+        {
+            foreach (var kvp in chunkClearLevel)
+            {
+                if (kvp.Value >= 1)
+                {
+                    yield return kvp.Key;
+                }
+            }
+        }
+
+        // ==========================================
+        // 5. SYSTEM (SPEICHERN & LADEN)
+        // ==========================================
+
+        public static void Load(string saveDir)
+        {
+            string path = Path.Combine(saveDir, "ausgerotteteChunks.json");
+
+            if (SicheresSpeichern.TryLoad(path, out Dictionary<string, int> geladeneDaten))
+            {
+                chunkClearLevel = geladeneDaten;
+                Log.Out($"[EinmaligerSpawn] {chunkClearLevel.Count} Chunk-Daten erfolgreich geladen.");
+            }
+            else
+            {
+                chunkClearLevel.Clear();
+                Log.Out("[EinmaligerSpawn] Beginne mit leerer Chunk-Datenbank.");
+            }
+        }
+
+        public static void Save(string saveDir)
+        {
+            string path = Path.Combine(saveDir, "ausgerotteteChunks.json");
+
+            // Sortierung beibehalten
+            var sortedChunks = chunkClearLevel
+                .OrderBy(kvp => kvp.Key)
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+            SicheresSpeichern.Save(path, sortedChunks);
+        }
+
         public static int Debug_EntferneNullEintraege()
         {
-            // Sammelt alle Chunk-IDs, deren Kill-Zahl 0 ist
-            var zuLoeschendeKeys = ChunkClearLevel
+            var zuLoeschendeKeys = chunkClearLevel
                 .Where(kvp => kvp.Value == 0)
                 .Select(kvp => kvp.Key)
                 .ToList();
 
             foreach (var key in zuLoeschendeKeys)
             {
-                ChunkClearLevel.Remove(key);
+                chunkClearLevel.Remove(key);
             }
 
             return zuLoeschendeKeys.Count;
+        }
+
+        public static bool EntferneNullEintrag(string chunkId)
+        {
+            if (chunkClearLevel.TryGetValue(chunkId, out int level) && level == 0)
+            { chunkClearLevel.Remove(chunkId); return true; }
+            return false;
+        }
+
+        public static void Reset()
+        {
+            chunkClearLevel.Clear();
+            ursprungsChunksLebenderZombies.Clear();
         }
     }
 }

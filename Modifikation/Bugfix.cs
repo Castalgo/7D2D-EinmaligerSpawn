@@ -52,11 +52,8 @@ namespace EinmaligerSpawn.BugFixes
                                 // Wir zwingen den Raum zurück in den aktiven Such-Modus
                                 volumeTraverse.Field("wasCleared").SetValue(false);
 
-                                // 5. Müllabfuhr in unserer Mod
-                                if (ChunkClearManager.ZombieUrsprung.ContainsKey(__instance.entityId))
-                                {
-                                    ChunkClearManager.ZombieUrsprung.Remove(__instance.entityId);
-                                }
+                                // 5. Müllabfuhr in unserer Mod (Kapselung über den Manager)
+                                ChunkClearManager.RemoveUrsprungsChunkLebenderZombie(__instance.entityId);
 
                                 // Wir haben den Raum gefunden und repariert, Suche abbrechen!
                                 return;

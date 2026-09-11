@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using EinmaligerSpawn.Benachrichtigungen;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
-using EinmaligerSpawn.Minimap_Patch;
-using EinmaligerSpawn.Network;
 using EinmaligerSpawn.PoiTracker;
 using HarmonyLib;
 using UnityEngine;
 
-namespace EinmaligerSpawn.SpawnBlocker
+namespace EinmaligerSpawn.KillTracking
 {
     [HarmonyPatch(typeof(EntityAlive), "SetDead")]
-    public class TodesListener_Patch
+    public class KillTracker_Patch
     {
         //  Wir schalten uns VOR die Engine-Logik
         [HarmonyPrefix]
@@ -63,13 +62,13 @@ namespace EinmaligerSpawn.SpawnBlocker
                 int tCz = Utils.Fastfloor(todesPos.z / 16f);
                 string todesChunkId = $"{tCx}_{tCz}";
 
-                string ursprungsChunk;
+                // 2. Woher kommt der Zombie? Sicherer Wrapper-Aufruf
+                string ursprungsChunk = ChunkClearManager.GetUrsprungsChunkLebenderZombie(__instance.entityId);
 
-                // 2. Woher kommt der Zombie?
-                if (ChunkClearManager.ZombieUrsprung.TryGetValue(__instance.entityId, out ursprungsChunk))
+                if (ursprungsChunk != null)
                 {
                     // Er stammt aus unserem regulären Biom-Spawn -> Aus dem RAM löschen
-                    ChunkClearManager.ZombieUrsprung.Remove(__instance.entityId);
+                    ChunkClearManager.RemoveUrsprungsChunkLebenderZombie(__instance.entityId);
                 }
                 else
                 {
@@ -79,7 +78,7 @@ namespace EinmaligerSpawn.SpawnBlocker
                 }
 
                 // 3. REGEL 1: Den regulären Kill IMMER im Ursprungs-Chunk verbuchen
-                ChunkClearManager.AddToterZombieNachID(ursprungsChunk, 1);
+                ChunkClearManager.AddRegulaerenKill(ursprungsChunk);
 
                 // Abbruch, wenn der taktische Kill in der Config deaktiviert ist
                 if (!ModEinstellungen.TaktischerKillAktiv) return;
@@ -129,7 +128,7 @@ namespace EinmaligerSpawn.SpawnBlocker
                         string nachbarId = $"{nX}_{nZ}";
 
                         // Hat der Nachbar-Chunk schon eine Historie?
-                        if (ChunkClearManager.ChunkClearLevel.ContainsKey(nachbarId) && ChunkClearManager.ChunkClearLevel[nachbarId] >= 1)
+                        if (ChunkClearManager.GetChunkLevel(nachbarId) >= 1)
                         {
                             continue; // nächstes Element von foreach
                         }
@@ -158,15 +157,15 @@ namespace EinmaligerSpawn.SpawnBlocker
                         if (!hatAktiveFeinde)
                         {
                             // Die Datenbank übernimmt jetzt das Speichern und die Map
-                            ChunkClearManager.VerbucheTaktischenKill(nachbarId, true);
+                            ChunkClearManager.AddTaktischenKill(nachbarId, true);
 
                             return; // Nachbar belohnt -> Fertig!
                         }
                     }
 
                     // FALLBACK SZENARIO A: Kein leerer Nachbar gefunden.
-                    // Todes-Chunk bekommt den Bonus-Kill (geht somit z. B. von 0 auf 2)
-                    ChunkClearManager.ChunkClearLevel[todesChunkId]++;
+                    // Die Manager-Methode kapselt das Zählen automatisch und sicher
+                    ChunkClearManager.AddTaktischenKill(todesChunkId, false);
                 }
                 else
                 {
@@ -174,16 +173,8 @@ namespace EinmaligerSpawn.SpawnBlocker
                     // SZENARIO B: Gekitet! Zombie stirbt restlos in einem FREMDEN Chunk
                     // -> Der Todes-Chunk bekommt den Bonus-Kill.
                     // ---------------------------------------------------------
-                    if (!ChunkClearManager.ChunkClearLevel.ContainsKey(todesChunkId) || ChunkClearManager.ChunkClearLevel[todesChunkId] < 1)
-                    {
-                        // Die Datenbank übernimmt das Setzen auf 1 und das Map-Update
-                        ChunkClearManager.VerbucheTaktischenKill(todesChunkId, false);
-                    }
-                    else
-                    {
-                        // Chunk war ohnehin schon clear -> Er bekommt einfach den Bonus-Kill addiert
-                        ChunkClearManager.ChunkClearLevel[todesChunkId]++;
-                    }
+                    // Kapselung: Ersetzt die if/else Logik komplett. Der Manager weiß selbst, ob er auf 1 setzen oder hochzählen muss.
+                    ChunkClearManager.AddTaktischenKill(todesChunkId, false);
                 }
             }
         }
@@ -209,28 +200,13 @@ namespace EinmaligerSpawn.SpawnBlocker
 
             if (istKomplettLeer)
             {
-                PoiDatenbank.SetzeStatus(poi.id, 1);
+                // Kapselung: Ersetzt SetzeStatus, NetPackage-Aufruf und Map-Redraw
+                PoiDatenbank.VerarbeitePoiStatus(poi.id, 1);
+
                 Log.Warning($"[EinmaligerSpawn] POI '{poi.name}' (ID: {poi.id}) wurde restlos gesäubert!");
 
-                // Chatnachricht im Einzelspieler und für den Host im Multiplayer
-                if (!GameManager.IsDedicatedServer && (ModEinstellungen.ChatNachrichtenModus == 1 || ModEinstellungen.ChatNachrichtenModus == 3))
-                {
-                    ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                    string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
-
-                    // Passe 'chunkId' an den Namen der Variable an, die du in der Methode für die Chunk-Koordinaten nutzt
-                    string feedbackMsg = $"[00FF00][{timeString}] POI {poi.name} wurde restlos gesäubert![-]";
-
-                    GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
-                }
-
-                if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
-                {
-                    SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(poi.id));
-                }
-
-                // erzwingt Minimap Update, sofern Minimap Mod aktiv
-                SimpleMinimap_Patch.ErzwingeRedraw = true;
+                // Kapselung: Zentrale UI-Benachrichtigung
+                NotificationManager.SendePoiClear(poi.name);
             }
         }
     }

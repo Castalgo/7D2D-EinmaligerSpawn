@@ -6,7 +6,7 @@
 
 using HarmonyLib;
 
-namespace EinmaligerSpawn.SpawnBlocker
+namespace EinmaligerSpawn.BiomSpawnBlocker
 {
     [HarmonyPatch(typeof(SleeperVolume), "Reset")]
     public class SleeperVolume_Reset_Patch

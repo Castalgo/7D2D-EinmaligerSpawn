@@ -93,11 +93,11 @@ namespace EinmaligerSpawn.Minimap_Patch
                     int worldChunkX = ___renderChunkX + chunkX_offset;
                     string chunkId = $"{worldChunkX}_{worldChunkZ}";
 
-                    // Prüfen, ob unser Chunk als "gecleart" gilt
-                    if (ChunkClearManager.ChunkClearLevel.TryGetValue(chunkId, out int kills) && kills >= 1)
+                    // Prüfen, ob unser Chunk als "gecleart" gilt über den sicheren Wrapper
+                    if (ChunkClearManager.GetChunkLevel(chunkId) >= 1)
                     {
-                        // NEU: Ist dieser Chunk frisch gecleart (und soll gelb/orange leuchten)?
-                        bool isNeuGecleart = KartenOverlay.NeuGeclearteChunks.ContainsKey(chunkId);
+                        // Abfrage nun über sicheren Getter
+                        bool isNeuGecleart = KartenOverlay.IstChunkNeuGecleart(chunkId);
 
                         // Start-Index für diesen Chunk im 1D-Array der Textur
                         // Formel aus der fremden Mod: i * 16 * 768 + j * 16

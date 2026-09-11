@@ -24,7 +24,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
                 {
                     ChunkClearManager.Save(savePath);
-                    PoiDatenbank.Save(savePath); // Neu hinzugefügt
+                    PoiDatenbank.Save(savePath);
                 }
 
                 // Einstellungen für dieses Savegame speichern
@@ -66,7 +66,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
             // 1. NUR SERVER
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
             {
-                // 1.1Scanner sofort hart abbrechen, falls er noch läuft!
+                // 1.1 Scanner sofort hart abbrechen, falls er noch läuft!
                 GlobalMapScanner.StoppeGlobalenScan();
                 // 1.2 Dynamisches Spawn-Limit zurücksetzen 
                 DynamischesSpawnLimit.IstInitialisiert = false;
@@ -76,21 +76,13 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 LokalenChunkSaeubern.Reset();
             }
 
-            // 2. Temporäres Zombie-Gedächtnis leeren (sicherheitshalber)
-            if (ChunkClearManager.ZombieUrsprung != null)
-            {
-                ChunkClearManager.ZombieUrsprung.Clear();
-            }
-            if (ChunkClearManager.ChunkClearLevel != null)
-                ChunkClearManager.ChunkClearLevel.Clear();
+            // 2. Chunk-Gedächtnis sicher über den Manager leeren
+            ChunkClearManager.Reset();
 
             // 3. POI-Datenbank leeren
-            if (PoiDatenbank.PoiZustaende != null)
-            {
-                PoiDatenbank.PoiZustaende.Clear();
-            }
+            PoiDatenbank.Reset();
 
-            // 4. Map-Tracker leeren (NEU)
+            // 4. Map-Tracker leeren
             KartenOverlayManager.KartenOverlay.Reset();
         }
     }
@@ -118,22 +110,15 @@ namespace EinmaligerSpawn.SaveLoadPatches
             // 2. Netzwerk-Sync (Nur der Server schickt Daten an externe Mitspieler)
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer && _cInfo != null)
             {
-                // Chunk-Gedächtnis zusammenstellen
-                List<string> relevanteChunks = new List<string>();
-                foreach (var kvp in ChunkClearManager.ChunkClearLevel)
-                {
-                    if (kvp.Value >= 1)
-                    {
-                        relevanteChunks.Add(kvp.Key);
-                    }
-                }
+                // Chunk-Gedächtnis zusammenstellen (Nutzung der Manager-Methode statt direkter Dictionary-Schleife)
+                List<string> relevanteChunks = new List<string>(ChunkClearManager.GetAlleGesperrtenChunks());
 
                 Log.Out($"[EinmaligerSpawn] Netzwerk (Prefix): Sende Chunk-Gedächtnis ({relevanteChunks.Count} Einträge) an {_cInfo.playerName}...");
                 NetPackageChunkSync package = NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLogin(relevanteChunks);
                 _cInfo.SendPackage(package);
-                
+
                 // POI-Gedächtnis zusammenstellen
-                List<int> relevantePOIs = new List<int>(PoiDatenbank.PoiZustaende.Keys);
+                List<int> relevantePOIs = new List<int>(PoiDatenbank.GetAllePoiIds());
                 Log.Out($"[EinmaligerSpawn] Netzwerk (Prefix): Sende POI-Gedächtnis ({relevantePOIs.Count} Einträge) an {_cInfo.playerName}...");
                 NetPackagePoiSync poiPackage = NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLogin(relevantePOIs);
                 _cInfo.SendPackage(poiPackage);
@@ -145,7 +130,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
         [HarmonyPostfix]
         public static void Postfix(ClientInfo _cInfo, RespawnType _respawnReason, Vector3i _pos, int _entityId)
         {
-            Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Postfix - Start");
+            //Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Postfix - Start");
 
             // =================================================================
             // POSTFIX: Sichere UI- und GameObject-Zuweisungen nach dem Spawn
@@ -192,19 +177,19 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 Log.Out("[EinmaligerSpawn] Late-Init (Postfix): Kartenoverlay, lokaler Fortschrittsbuff und POI-Radar wurden initialisiert.");
             }
 
-            Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Postfix - Ende");
-
-
+            //Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Postfix - Ende");
         }
 
-        // Die neue Hintergrund-Routine
+        // Hintergrund-Routine
         private static System.Collections.IEnumerator VerzoegerterMapRedraw()
         {
             // Pausiert diese spezifische Methode für 5 Sekunden, das restliche Spiel läuft normal weiter
             yield return new UnityEngine.WaitForSeconds(5f);
 
             KartenOverlay.Wiederherstellen();
-            KartenOverlay.ErzwingeRedraw();
+
+            // Kapselung: Der zentrale UI-Befehl aktualisiert nun beide Karten (Mini & Welt) sicher
+            KartenOverlay.RequestMapUpdate();
 
             Log.Out("[EinmaligerSpawn] Late-Init (Verzögert): Kartenoverlay wurde nach 5 Sekunden erfolgreich geladen.");
         }

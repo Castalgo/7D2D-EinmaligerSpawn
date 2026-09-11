@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
+using EinmaligerSpawn.Benachrichtigungen;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
 using EinmaligerSpawn.LocalClear;
-using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.Network;
 using EinmaligerSpawn.PoiTracker;
 using EinmaligerSpawn.ZombieSpawner;
@@ -612,8 +610,6 @@ namespace EinmaligerSpawn.Commands
 
         /// Setzt Chunks im Umkreis auf gesäubert oder löscht den Status.
         /// Aufruf: esa cheat_clear [Spieler] [Radius] [clear/reset]
-        /// Setzt Chunks im Umkreis auf gesäubert oder löscht den Status.
-        /// Aufruf: esa cheat_clear [Spieler] [Radius] [clear/reset]
         private void CmdCheatClear(List<string> _params, CommandSenderInfo _senderInfo)
         {
             EntityPlayer targetPlayer = null;
@@ -677,7 +673,7 @@ namespace EinmaligerSpawn.Commands
             int chunkSuchRadius = Mathf.CeilToInt((float)radiusMeter / 16f);
             int maxDistSq = radiusMeter * radiusMeter;
 
-            int newlyModified = 0;
+            List<string> chunksToProcess = new List<string>();
             int totalChecked = 0;
 
             for (int cx = playerChunkX - chunkSuchRadius; cx <= playerChunkX + chunkSuchRadius; cx++)
@@ -697,46 +693,30 @@ namespace EinmaligerSpawn.Commands
                         totalChecked++;
                         string chunkId = $"{cx}_{cz}";
 
+                        // Logik-Trennung: Wir filtern hier nur noch, der Manager übernimmt die UI-Warnungen & Redraws
                         if (isReset)
                         {
-                            if (ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
+                            if (ChunkClearManager.HatChunkEintrag(chunkId))
                             {
-                                ChunkClearManager.ChunkClearLevel.Remove(chunkId);
-                                newlyModified++;
+                                chunksToProcess.Add(chunkId);
                             }
                         }
                         else
                         {
-                            if (!ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
-                                ChunkClearManager.ChunkClearLevel[chunkId] = 0;
-
-                            ChunkClearManager.ChunkClearLevel[chunkId]++;
-                            newlyModified++;
-
-                            SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
+                            chunksToProcess.Add(chunkId);
                         }
                     }
                 }
             }
 
+            int newlyModified = chunksToProcess.Count;
+            if (newlyModified > 0)
+            {
+                ChunkClearManager.VerarbeiteAdminBefehl(chunksToProcess, isReset);
+            }
+
             string actionText = isReset ? "reaktiviert (Reset)" : "neu ausgerottet (Clear)";
             SingletonMonoBehaviour<SdtdConsole>.Instance.Output($"[ESa range] Ich habe {totalChecked} Chunks im Umkreis von {targetPlayer.EntityName} geprüft und {newlyModified} {actionText}.");
-
-            SimpleMinimap_Patch.ErzwingeRedraw = true;
-
-            // WARNSYSTEM BEIM RESET
-            if (isReset && newlyModified > 0)
-            {
-                int spielerAnzahl = GameManager.Instance.World.Players.list.Count;
-                bool hatExterneClients = GameManager.IsDedicatedServer ? spielerAnzahl > 0 : spielerAnzahl > 1;
-
-                if (hatExterneClients)
-                {
-                    string warnMsg = "[FFFF00]Warnung: Ein Chunk-Reset wurde durchgeführt! Eure lokalen Karten-Daten sind nun asynchron. Bitte verbindet euch einmal neu, um das Problem zu beheben.[-]";
-
-                    GameManager.Instance.ChatMessageServer(null, EChatType.Global, -1, warnMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
-                }
-            }
         }
 
         /// Legt das globale Autospawn-Limit für Zombies auf dem Server fest.
@@ -907,25 +887,9 @@ namespace EinmaligerSpawn.Commands
             // Globaler Spielchat (NUR wenn aus dem Menü aufgerufen, dank "fromUI" Erkennung)
             if (fromUI)
             {
-                GameManager.Instance.ChatMessageServer(
-                    null,
-                    EChatType.Global,
-                    -1,
-                    msg1,
-                    null,
-                    EMessageSender.Server,
-                    GeneratedTextManager.BbCodeSupportMode.Supported
-                );
-
-                GameManager.Instance.ChatMessageServer(
-                    null,
-                    EChatType.Global,
-                    -1,
-                    msg2,
-                    null,
-                    EMessageSender.Server,
-                    GeneratedTextManager.BbCodeSupportMode.Supported
-                );
+                // Kapselung: Zentrale UI-Benachrichtigung
+                NotificationManager.SendeGlobaleNachricht(msg1);
+                NotificationManager.SendeGlobaleNachricht(msg2);
             }
         }
 
@@ -975,10 +939,9 @@ namespace EinmaligerSpawn.Commands
 
                         string chunkId = $"{chunk.X}_{chunk.Z}";
 
-                        // Nur löschen, wenn er existiert und auf 0 steht
-                        if (ChunkClearManager.ChunkClearLevel.TryGetValue(chunkId, out int kills) && kills == 0)
+                        // Nutze den neuen Türsteher-Befehl aus dem Manager
+                        if (ChunkClearManager.EntferneNullEintrag(chunkId))
                         {
-                            ChunkClearManager.ChunkClearLevel.Remove(chunkId);
                             localDeleted++;
                         }
                     }

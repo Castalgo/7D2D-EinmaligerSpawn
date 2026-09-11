@@ -1,9 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using EinmaligerSpawn.Benachrichtigungen;
 using EinmaligerSpawn.ChunkDatenbank;
 using EinmaligerSpawn.Config;
 using EinmaligerSpawn.KartenOverlayManager;
-using EinmaligerSpawn.Minimap_Patch;
 using EinmaligerSpawn.PoiTracker;
 using UnityEngine;
 
@@ -29,6 +28,8 @@ namespace EinmaligerSpawn.Network
             this.gesaeuberteChunks = new List<string>(alleChunks);
             this.isLoginSync = true;
 
+            // Beim Login erzwingt der Server seine Config-Werte auf dem Client, 
+            // um Cheating durch modifizierte lokale Configs zu verhindern.
             this.globalesZombieLimit = ModEinstellungen.GlobalesZombieLimit;
             this.lokalerChunkClearAktiv = ModEinstellungen.LokalerChunkClearAktiv;
             this.spawnCheckIntervall = ModEinstellungen.SpawnCheckIntervall;
@@ -49,11 +50,12 @@ namespace EinmaligerSpawn.Network
         public override void write(PooledBinaryWriter _writer)
         {
             base.write(_writer);
-
             System.IO.BinaryWriter baseWriter = _writer;
 
             baseWriter.Write(this.isLoginSync);
 
+            // Config-Sync wird nur einmalig beim Login gesendet, 
+            // um die Paketgröße im laufenden Spiel (Live-Sync) minimal zu halten.
             if (this.isLoginSync)
             {
                 baseWriter.Write(this.globalesZombieLimit);
@@ -109,29 +111,26 @@ namespace EinmaligerSpawn.Network
             bool datenGeaendert = false;
             foreach (string chunkId in gesaeuberteChunks)
             {
-                if (!ChunkClearManager.ChunkClearLevel.ContainsKey(chunkId))
+                if (!ChunkClearManager.HatChunkEintrag(chunkId))
                 {
-                    ChunkClearManager.ChunkClearLevel[chunkId] = 1;
+                    // Trägt den Chunk lokal ein. Minimap-Redraw ist im Wrapper bereits enthalten.
+                    ChunkClearManager.VerarbeiteScannerBatch(new List<string> { chunkId }, 1);
                     datenGeaendert = true;
 
-                    // LOKALE CHAT-NACHRICHT FÜR DEN SPIELER
-                    if (!this.isLoginSync && (ModEinstellungen.ChatNachrichtenModus == 2 || ModEinstellungen.ChatNachrichtenModus == 3))
+                    // Unterdrückt Chat-Nachrichten während des Logins
+                    // Kapselung: Zentrale UI-Benachrichtigung (Config-Check passiert intern)
+                    if (!this.isLoginSync)
                     {
-                        ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                        string timeString = $"Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}";
-                        string feedbackMsg = $"[00FF00][{timeString}] Gebiet {chunkId} wurde dauerhaft gesäubert![-]";
-
-                        GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                        NotificationManager.SendeChunkClear(chunkId);
                     }
-
-                    // erzwingt Minimap Update, sofern Minimap Mod aktiv
-                    SimpleMinimap_Patch.ErzwingeRedraw = true;
                 }
             }
 
-            if (datenGeaendert && KartenOverlay.IstAktiv)
+            // Kapselung: Zentrales Map-Update für Minimap & Weltkarte wird nur einmal am Ende der Schleife ausgelöst, 
+            // um bei massenhaften Updates (z. B. Admin-Reset) die FPS nicht in den Keller zu treiben.
+            if (datenGeaendert)
             {
-                KartenOverlay.ErzwingeRedraw();
+                KartenOverlay.RequestMapUpdate();
             }
         }
 
@@ -150,21 +149,19 @@ namespace EinmaligerSpawn.Network
     }
 
     // Übermittelt den aktuellen POI-Fortschritt (1 = gesäubert, 2 = Quest-Endspurt) an alle Clients.
-    // Aktualisiert die lokale Datenbank, zeichnet die Minimap neu und triggert Erfolgsnachrichten im Chat.
     public class NetPackagePoiSync : NetPackage
     {
-        // Speichert jetzt die POI-ID (Key) und den zugehörigen Status (Value: 1 oder 2)
         private Dictionary<int, byte> syncPois = new Dictionary<int, byte>();
         private bool isLoginSync = false;
 
-        // Konstruktor
         public NetPackagePoiSync() { }
 
         public NetPackagePoiSync SetupForLogin(List<int> allePois)
         {
             this.syncPois.Clear();
 
-            // FILTER: Sendet alle POIs, die einen Status > 0 haben (also 1 oder 2)
+            // Filtert Gebäude mit Status 0 (unangetastet) aus, 
+            // da der Standardwert bei Clients ohnehin 0 ist. Das spart massiv Bandbreite beim Login.
             foreach (int poiId in allePois)
             {
                 byte status = PoiDatenbank.LeseStatus(poiId);
@@ -195,8 +192,8 @@ namespace EinmaligerSpawn.Network
             baseWriter.Write(syncPois.Count);
             foreach (var kvp in syncPois)
             {
-                baseWriter.Write(kvp.Key);   // 4 Bytes (Int32)
-                baseWriter.Write(kvp.Value); // 1 Byte (Byte)
+                baseWriter.Write(kvp.Key);
+                baseWriter.Write(kvp.Value);
             }
         }
 
@@ -218,9 +215,8 @@ namespace EinmaligerSpawn.Network
         public override void ProcessPackage(World _world, GameManager _callbacks)
         {
             if (_world == null) return;
-
-            // WICHTIG: Nur Clients werten dieses Paket aus. 
-            // Der Server hat seine eigene Datenbank bereits VOR dem Senden lokal aktualisiert.
+            // WICHTIG: Der Server sendet dieses Paket, wertet es aber nicht selbst aus, 
+            // da er seine eigene Datenbank vor dem Senden bereits aktualisiert hat.
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer) return;
 
             foreach (var kvp in syncPois)
@@ -229,38 +225,32 @@ namespace EinmaligerSpawn.Network
                 byte empfangenerStatus = kvp.Value;
                 byte lokalerStatus = PoiDatenbank.LeseStatus(poiId);
 
-                // Nur verarbeiten, wenn sich der Status wirklich geändert hat
                 if (lokalerStatus != empfangenerStatus)
                 {
-                    PoiDatenbank.SetzeStatus(poiId, empfangenerStatus);
+                    // Kapselung: Client trägt Status ein und löst lokalen UI-Sync (Minimap) aus.
+                    PoiDatenbank.VerarbeitePoiStatus(poiId, empfangenerStatus);
 
-                    // CHAT-NACHRICHT NUR BEI STATUS 1 (Komplett gesäubert)
-                    if (empfangenerStatus == 1 && !this.isLoginSync && (ModEinstellungen.ChatNachrichtenModus == 1 || ModEinstellungen.ChatNachrichtenModus == 3))
+                    if (empfangenerStatus == 1 && !this.isLoginSync)
                     {
                         string poiName = "Unbekannt";
                         PrefabInstance poi = GameManager.Instance.GetDynamicPrefabDecorator()?.GetPrefab(poiId);
                         if (poi != null) poiName = poi.name;
 
-                        ValueTuple<int, int, int> time = GameUtils.WorldTimeToElements(GameManager.Instance.World.worldTime);
-                        string feedbackMsg = $"[00FF00][Tag {time.Item1}, {time.Item2:00}:{time.Item3:00}] POI '{poiName}' wurde restlos gesäubert![-]";
-
-                        // Schreibt die Nachricht in das lokale Chat-Fenster des Clients
-                        GameManager.Instance.ChatMessageClient(EChatType.Global, -1, feedbackMsg, null, EMessageSender.Server, GeneratedTextManager.BbCodeSupportMode.Supported);
+                        // Kapselung: Zentrale UI-Benachrichtigung
+                        NotificationManager.SendePoiClear(poiName);
                     }
-
-                    SimpleMinimap_Patch.ErzwingeRedraw = true;
                 }
             }
         }
 
         public override int GetLength()
         {
-            // 1 (bool) + 4 (int) + (Anzahl * 5 Bytes pro Eintrag)
             return 1 + 4 + (syncPois.Count * 5);
         }
     }
 
     // Sendet dem Client auf Anfrage die exakte Koordinate und den Radar-Typ (2D oder 3D).
+    // Wird benötigt, da Clients nicht alle Entities/Sleeper eines weitläufigen POIs verlässlich in ihrem RAM haben.
     public class NetPackagePoiRadarUpdate : NetPackage
     {
         private int poiId;
@@ -301,13 +291,14 @@ namespace EinmaligerSpawn.Network
         public override void ProcessPackage(World _world, GameManager _callbacks)
         {
             if (_world == null) return;
-            // Client trägt die Server-Antwort in sein lokales Gedächtnis ein
+            // Client trägt die Server-Antwort in sein lokales Gedächtnis ein, 
+            // damit der PoiRadarManager die NavObjects flüssig im Update()-Tick zeichnen kann.
             PoiTracker.PoiRadarManager.ClientZiele[this.poiId] = this.zielKoordinate;
             PoiTracker.PoiRadarManager.ClientMarkerKlassen[this.poiId] = this.markerKlasse;
         }
     }
 
-    // Der Client bittet den Server, einen POI zu überprüfen. Der Server entscheidet.
+    // Der Client bittet den Server, einen POI zu überprüfen. Der Server als alleinige Autorität entscheidet.
     public class NetPackageRequestPoiCheck : NetPackage
     {
         private int poiId;
@@ -347,6 +338,7 @@ namespace EinmaligerSpawn.Network
 
             if (this.requestedStatus == 1)
             {
+                // Zählt die tatsächlichen Sleeper im serverseitigen RAM (nicht render-abhängig).
                 int totalValid = 0;
                 int clearedValid = 0;
                 if (poi.sleeperVolumes != null)
@@ -363,20 +355,19 @@ namespace EinmaligerSpawn.Network
                 {
                     if (PoiDatenbank.LeseStatus(this.poiId) != 1)
                     {
-                        PoiDatenbank.SetzeStatus(this.poiId, 1);
                         Log.Out($"[EinmaligerSpawn] Server-Prüfung bestätigt: POI '{poi.name}' ist leer (Status 1).");
-                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(this.poiId, 1));
+                        PoiDatenbank.VerarbeitePoiStatus(this.poiId, 1);
                     }
                 }
             }
             else if (this.requestedStatus == 2)
             {
+                // Status 2 bedeutet: Gebäude durch Quest-Marker reaktiviert.
                 if (PoiDatenbank.LeseStatus(this.poiId) == 0)
                 {
                     bool questAuthentifiziert = false;
                     EntityPlayer requestingPlayer = null;
 
-                    // 1. Absender ermitteln (Multiplayer vs. lokaler Host)
                     if (this.Sender != null)
                     {
                         GameManager.Instance.World.Players.dict.TryGetValue(this.Sender.entityId, out requestingPlayer);
@@ -386,7 +377,8 @@ namespace EinmaligerSpawn.Network
                         requestingPlayer = GameManager.Instance.World.GetPrimaryPlayer();
                     }
 
-                    // 2. Serverseitige Verifizierung des Quest-Tagebuchs
+                    // SECURITY-CHECK: Der Server verifiziert zwingend im eigenen Journal des Spielers, 
+                    // ob dieser dort wirklich eine abschlussbereite Quest besitzt. Verhindert Exploit-Cheating.
                     if (requestingPlayer != null && requestingPlayer.QuestJournal != null && requestingPlayer.QuestJournal.quests != null)
                     {
                         foreach (Quest q in requestingPlayer.QuestJournal.quests)
@@ -406,12 +398,10 @@ namespace EinmaligerSpawn.Network
                         }
                     }
 
-                    // 3. Entscheidung fällen
                     if (questAuthentifiziert)
                     {
-                        PoiDatenbank.SetzeStatus(this.poiId, 2);
                         Log.Out($"[EinmaligerSpawn] Server verifiziert Quest-Abschluss: POI '{poi.name}' (Status 2).");
-                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(this.poiId, 2));
+                        PoiDatenbank.VerarbeitePoiStatus(this.poiId, 2);
                     }
                     else
                     {
@@ -422,7 +412,6 @@ namespace EinmaligerSpawn.Network
             }
             else if (this.requestedStatus == 3)
             {
-                // RADAR-ANFRAGE: Server analysiert den Raum für den anfragenden Client
                 int totalValid = 0;
                 int clearedValid = 0;
                 bool hasUnclearedBossRoom = false;
@@ -448,13 +437,13 @@ namespace EinmaligerSpawn.Network
                 {
                     if (PoiDatenbank.LeseStatus(this.poiId) != 1)
                     {
-                        PoiDatenbank.SetzeStatus(this.poiId, 1);
-                        SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackagePoiSync>().SetupForLive(this.poiId, 1));
+                        PoiDatenbank.VerarbeitePoiStatus(this.poiId, 1);
                     }
                 }
                 else if (nextTarget != null && this.Sender != null)
                 {
-                    // Server entscheidet die Radar-Farbe basierend auf den echten Server-Zahlen
+                    // Berechnet die Warnstufe (Markerfarbe) auf Basis dynamischer Schwellenwerte.
+                    // Die Berechnung erfolgt auf dem Server, um Diskrepanzen bei Clients (z.B. durch Lag) zu vermeiden.
                     string berechneteKlasse = "es_poi_map_only";
                     if (poi.prefab != null && poi.prefab.DifficultyTier > 0)
                     {
@@ -474,7 +463,8 @@ namespace EinmaligerSpawn.Network
                         }
                     }
 
-                    // Antwort gezielt nur an den suchenden Client senden
+                    // Die Radar-Daten sind für den Spielfortschritt irrelevant und hoch dynamisch, 
+                    // daher gehen sie nur an den spezifischen Anfrager zurück und nicht an alle Clients.
                     this.Sender.SendPackage(NetPackageManager.GetPackage<NetPackagePoiRadarUpdate>().Setup(this.poiId, nextTarget.Center, berechneteKlasse));
                 }
             }
