@@ -17,13 +17,28 @@ namespace EinmaligerSpawn.JSONSpeichern
                 try
                 {
                     string json = File.ReadAllText(pfad);
-                    result = JsonConvert.DeserializeObject<T>(json) ?? new T();
+
+                    // FIX: Leere oder "null"-Strings sofort als Fehler behandeln, 
+                    // damit der catch-Block das Backup triggert.
+                    if (string.IsNullOrWhiteSpace(json) || json.Trim() == "null")
+                    {
+                        throw new Exception("Datei ist leer oder enthält keine gültigen Daten.");
+                    }
+
+                    T parsed = JsonConvert.DeserializeObject<T>(json);
+
+                    if (parsed == null)
+                    {
+                        throw new Exception("Deserialisierung resultierte in null.");
+                    }
+
+                    result = parsed;
                     return true;
                 }
                 catch (Exception e)
                 {
                     Log.Error($"[EinmaligerSpawn] Datenkorruption in {pfad} erkannt: {e.Message}");
-                    // Defekte Datei zur manuellen Reparatur durch den Admin isolieren
+                    // Defekte/Leere Datei zur manuellen Reparatur durch den Admin isolieren
                     string corruptPfad = pfad + ".corrupt_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
                     try { File.Move(pfad, corruptPfad); } catch { }
                     Log.Warning($"[EinmaligerSpawn] Defekte Datei gesichert unter: {corruptPfad}");
@@ -37,7 +52,16 @@ namespace EinmaligerSpawn.JSONSpeichern
                 try
                 {
                     string json = File.ReadAllText(bakPfad);
-                    result = JsonConvert.DeserializeObject<T>(json) ?? new T();
+
+                    if (string.IsNullOrWhiteSpace(json) || json.Trim() == "null")
+                    {
+                        throw new Exception("Backup-Datei ist ebenfalls leer.");
+                    }
+
+                    T parsed = JsonConvert.DeserializeObject<T>(json);
+                    if (parsed == null) throw new Exception("Backup-Deserialisierung resultierte in null.");
+
+                    result = parsed;
                     Log.Out("[EinmaligerSpawn] Backup erfolgreich wiederhergestellt!");
                     return true;
                 }

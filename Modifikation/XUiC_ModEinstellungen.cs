@@ -365,6 +365,7 @@ public class XUiC_GrafischeModEinstellungen : XUiController
         if (cbxLimit == null) return;
         ModEinstellungen.GlobalesZombieLimit = (int)cbxLimit.Value;
         Manager.PlayInsidePlayerHead("craft_complete_item", -1, 0f, false, false);
+        ModEinstellungen.Speichern();
     }
 
     // 6. Klick: Schaltet den lokalen Chunk-Clear um (ON/OFF) und speichert direkt.
@@ -412,6 +413,7 @@ public class XUiC_GrafischeModEinstellungen : XUiController
         if (cbxTimer == null) return;
         ModEinstellungen.SpawnCheckIntervall = (float)cbxTimer.Value;
         Manager.PlayInsidePlayerHead("craft_complete_item", -1, 0f, false, false);
+        ModEinstellungen.Speichern();
     }
 }
 

@@ -38,7 +38,7 @@ namespace EinmaligerSpawn.ZombieSpawner
             int currentZombies = 0;
             foreach (Entity entity in GameManager.Instance.World.Entities.list) // Zählt alle aktiven Enemies
             {
-                if (entity is EntityEnemy || entity is EntityZombie)
+                if ((entity is EntityEnemy || entity is EntityZombie) && !entity.IsDead())
                 {
                     currentZombies++;
                 }
@@ -435,7 +435,11 @@ namespace EinmaligerSpawn.ZombieSpawner
                         break;
                     }
                 }
-                if (zuNahAnAnderemSpieler) continue; // Überspringe, wenn zu nah an einem anderen Spieler
+                if (zuNahAnAnderemSpieler)
+                {
+                    zielVerschoben = true; // muss auf true gesetzt werden, damit der Chunk nicht als unspawnbar markiert wird, falls alle Versuche fehlschlagen
+                    continue; // Überspringe, wenn zu nah an einem anderen Spieler
+                }
 
                 spawnPos = new Vector3(worldX + 0.5f, (float)y, worldZ + 0.5f);
                 return true;
@@ -665,6 +669,13 @@ namespace EinmaligerSpawn.ZombieSpawner
 
                         if (chunksSinceLastSave >= 500)
                         {
+                            // Chunk-Datenbank sofort sichern, dann den Status
+                            string saveDir = GameIO.GetSaveGameDir();
+                            if (!string.IsNullOrEmpty(saveDir))
+                            {
+                                ChunkClearManager.Save(saveDir);
+                            }
+
                             ModEinstellungen.Speichern();
 
                             chunksSinceLastSave = 0;
@@ -693,6 +704,13 @@ namespace EinmaligerSpawn.ZombieSpawner
             }
             else
             {
+                // Chunk-Datenbank sichern
+                string saveDir = GameIO.GetSaveGameDir();
+                if (!string.IsNullOrEmpty(saveDir))
+                {
+                    ChunkClearManager.Save(saveDir);
+                }
+
                 ModEinstellungen.GlobalScanAbgeschlossen = true;
                 ModEinstellungen.Speichern();
 

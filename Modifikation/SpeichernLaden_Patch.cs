@@ -94,20 +94,13 @@ namespace EinmaligerSpawn.SaveLoadPatches
         [HarmonyPrefix]
         public static void Prefix(ClientInfo _cInfo, RespawnType _respawnReason, Vector3i _pos, int _entityId)
         {
-            Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Prefix - Start");
+            //Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Prefix - Start");
 
             // =================================================================
             // PREFIX: Schwere Last & Netzwerk vor dem Erscheinen des Spielers
             // =================================================================
 
-            // 1. Lokale Einstellungen laden, sobald die Welt-ID/Pfad bekannt ist
-            string savePath = GameIO.GetSaveGameDir();
-            if (!string.IsNullOrEmpty(savePath))
-            {
-                ModEinstellungen.Laden(savePath);
-            }
-
-            // 2. Netzwerk-Sync (Nur der Server schickt Daten an externe Mitspieler)
+            // Netzwerk-Sync (Nur der Server schickt Daten an externe Mitspieler)
             if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer && _cInfo != null)
             {
                 // Chunk-Gedächtnis zusammenstellen (Nutzung der Manager-Methode statt direkter Dictionary-Schleife)
@@ -124,7 +117,7 @@ namespace EinmaligerSpawn.SaveLoadPatches
                 _cInfo.SendPackage(poiPackage);
             }
 
-            Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Prefix - Ende");
+            //Log.Out("[EinmaligerSpawn] PlayerSpawnedInWorld Prefix - Ende");
         }
 
         [HarmonyPostfix]

@@ -120,7 +120,7 @@ namespace EinmaligerSpawn.ChunkDatenbank
             {
                 chunkClearLevel[chunkId] = level;
 
-                if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer)
+                if (SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer && level >= 1)
                 {
                     SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(NetPackageManager.GetPackage<NetPackageChunkSync>().SetupForLive(chunkId));
                 }
